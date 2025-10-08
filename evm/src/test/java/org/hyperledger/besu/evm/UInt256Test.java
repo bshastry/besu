@@ -354,6 +354,26 @@ public class UInt256Test {
   }
 
   @Test
+  public void signedMod_8byte_operands() {
+    // Fuzzer test case 00000066-simpleops-19.json (Issue #1)
+    // SMOD with 8-byte operands: 0xffffffffffffffff % 0xd021262626262626
+    // Expected result: 0x2fded9d9d9d9d9d9 (verified against geth/nethermind/erigon/revm)
+    //
+    // This test verifies that 8-byte 0xffffffffffffffff is treated as POSITIVE (< 2^255)
+    // and produces the correct SMOD result.
+    Bytes aBytes = Bytes.fromHexString("0xffffffffffffffff");
+    Bytes bBytes = Bytes.fromHexString("0xd021262626262626");
+    Bytes32 expected =
+        Bytes32.leftPad(
+            Bytes.fromHexString(
+                "0x0000000000000000000000000000000000000000000000002fded9d9d9d9d9d9"));
+    UInt256 a = UInt256.fromBytesBE(aBytes.toArrayUnsafe());
+    UInt256 b = UInt256.fromBytesBE(bBytes.toArrayUnsafe());
+    Bytes32 remainder = Bytes32.leftPad(Bytes.wrap(a.signedMod(b).toBytesBE()));
+    assertThat(remainder).isEqualTo(expected);
+  }
+
+  @Test
   public void signedMod() {
     final Random random = new Random(432);
     for (int i = 0; i < SAMPLE_SIZE; i++) {
