@@ -34,8 +34,10 @@ dependencies {
   implementation project(':app')
   implementation project(':crypto:algorithms')
   implementation project(':datatypes')
+  implementation project(':ethereum:core')
   implementation project(':ethereum:referencetests')
   implementation project(':evm')
+  implementation project(':plugin-api')
   implementation project(':util')
 
   implementation 'com.fasterxml.jackson.core:jackson-databind'
@@ -45,6 +47,7 @@ dependencies {
   implementation 'org.jacoco:org.jacoco.agent'
   implementation 'org.jacoco:org.jacoco.core'
   implementation 'org.mockito:mockito-core'
+  implementation 'org.slf4j:slf4j-api'
 }
 
 application {
