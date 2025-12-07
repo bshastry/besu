@@ -32,13 +32,25 @@ echo "Step 3: Building fuzzer and all dependencies from scratch..."
     --no-build-cache
 
 echo ""
-echo "Step 4: Verifying installation..."
+echo "Step 4: Copying JaCoCo agent..."
+./gradlew :testfuzz:copyJacoco
+
+echo ""
+echo "Step 5: Verifying installation..."
 FUZZER_BIN="$BESU_ROOT/testfuzz/build/install/BesuFuzz/bin/BesuFuzz"
+JACOCO_JAR="$BESU_ROOT/testfuzz/build/install/BesuFuzz/lib/jacocoagent.jar"
 if [[ -f "$FUZZER_BIN" ]]; then
     echo "Fuzzer binary: $FUZZER_BIN"
-    echo "Build successful!"
 else
     echo "ERROR: Fuzzer binary not found at $FUZZER_BIN"
+    exit 1
+fi
+
+if [[ -f "$JACOCO_JAR" ]]; then
+    echo "JaCoCo agent: $JACOCO_JAR"
+    echo "Build successful!"
+else
+    echo "ERROR: JaCoCo agent not found at $JACOCO_JAR"
     exit 1
 fi
 
