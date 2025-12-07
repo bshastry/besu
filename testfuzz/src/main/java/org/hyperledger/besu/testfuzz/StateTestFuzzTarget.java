@@ -17,6 +17,7 @@ package org.hyperledger.besu.testfuzz;
 import org.hyperledger.besu.testfuzz.javafuzz.FuzzTarget;
 import org.hyperledger.besu.testfuzz.statetest.CombinedMutationStrategy;
 import org.hyperledger.besu.testfuzz.statetest.MutationStrategy;
+import org.hyperledger.besu.testfuzz.statetest.StateTestCorpusProvider;
 
 import java.io.File;
 import java.io.IOException;
@@ -61,14 +62,21 @@ public class StateTestFuzzTarget implements FuzzTarget {
    */
   public StateTestFuzzTarget(final String corpusDirs, final String defaultFork) {
     this.executor = new StateTestExecutor(defaultFork);
-    this.mutator = CombinedMutationStrategy.createDefault();
     this.corpus = new ArrayList<>();
 
     if (corpusDirs != null && !corpusDirs.isEmpty()) {
       loadCorpus(corpusDirs);
     }
 
-    LOG.info("StateTestFuzzTarget initialized with {} corpus entries", corpus.size());
+    // Create mutator with splicing if corpus is available
+    if (corpus.size() >= 2) {
+      StateTestCorpusProvider corpusProvider = new StateTestCorpusProvider(corpus);
+      this.mutator = CombinedMutationStrategy.createWithSplicing(corpusProvider);
+      LOG.info("StateTestFuzzTarget initialized with {} corpus entries (splicing enabled)", corpus.size());
+    } else {
+      this.mutator = CombinedMutationStrategy.createDefault();
+      LOG.info("StateTestFuzzTarget initialized with {} corpus entries (splicing disabled - need >= 2)", corpus.size());
+    }
   }
 
   /**

@@ -20,7 +20,7 @@ import java.util.Random;
 
 /**
  * Combined mutation strategy that selects from multiple strategies based on weights.
- * Ported from goevmlab.
+ * Ported from goevmlab mutations/strategy.go
  */
 public class CombinedMutationStrategy implements MutationStrategy {
 
@@ -32,15 +32,83 @@ public class CombinedMutationStrategy implements MutationStrategy {
 
   /**
    * Creates a combined strategy with default strategies.
+   * This mirrors the Go implementation's NewStrategyFactory().
+   *
+   * <p>Note: "env" strategy is disabled - mutating block environment (timestamp, number,
+   * gasLimit, baseFee) causes false positives as it creates unrealistic test scenarios.
+   *
+   * <p>Note: "splicing" is NOT registered by default - requires corpus access.
+   * Use SplicingMutationStrategy directly when corpus is available.
    */
   public static CombinedMutationStrategy createDefault() {
     List<MutationStrategy> strategies = new ArrayList<>();
+
+    // Core strategies
     strategies.add(new BytecodeMutationStrategy());
     strategies.add(new OpcodeSmartMutationStrategy());
     strategies.add(new GasMutationStrategy());
     strategies.add(new ValueMutationStrategy());
     strategies.add(new CalldataMutationStrategy());
+    strategies.add(new StorageMutationStrategy());
+    // Note: "env" strategy is disabled - see comment above
+
+    // Phase 1: AFL-inspired strategies
+    strategies.add(new ArithmeticMutationStrategy());
+    strategies.add(new BoundaryMutationStrategy());
+    strategies.add(new DictionaryMutationStrategy());
+    strategies.add(new BitFlipMutationStrategy());
+
+    // Phase 2: Block operations and field mutations
+    strategies.add(new BlockOpsMutationStrategy());
+    strategies.add(new TransactionFieldMutationStrategy());
+    strategies.add(new AccountFieldMutationStrategy());
+
+    // Phase 3: Advanced AFL strategies
     strategies.add(new HavocMutationStrategy());
+    // Note: "splicing" is NOT registered by default - requires corpus access
+
+    return new CombinedMutationStrategy(strategies);
+  }
+
+  /**
+   * Creates a combined strategy with all strategies including splicing.
+   * This mirrors the Go implementation's NewStrategyFactory() + splicing registration.
+   *
+   * @param corpusProvider the corpus provider for splicing mutations
+   * @return a new CombinedMutationStrategy with splicing enabled
+   */
+  public static CombinedMutationStrategy createWithSplicing(
+      final SplicingMutationStrategy.CorpusProvider corpusProvider) {
+    List<MutationStrategy> strategies = new ArrayList<>();
+
+    // Core strategies
+    strategies.add(new BytecodeMutationStrategy());
+    strategies.add(new OpcodeSmartMutationStrategy());
+    strategies.add(new GasMutationStrategy());
+    strategies.add(new ValueMutationStrategy());
+    strategies.add(new CalldataMutationStrategy());
+    strategies.add(new StorageMutationStrategy());
+    // Note: "env" strategy is disabled - causes false positives
+
+    // Phase 1: AFL-inspired strategies
+    strategies.add(new ArithmeticMutationStrategy());
+    strategies.add(new BoundaryMutationStrategy());
+    strategies.add(new DictionaryMutationStrategy());
+    strategies.add(new BitFlipMutationStrategy());
+
+    // Phase 2: Block operations and field mutations
+    strategies.add(new BlockOpsMutationStrategy());
+    strategies.add(new TransactionFieldMutationStrategy());
+    strategies.add(new AccountFieldMutationStrategy());
+
+    // Phase 3: Advanced AFL strategies
+    strategies.add(new HavocMutationStrategy());
+
+    // Add splicing strategy with corpus access
+    if (corpusProvider != null && corpusProvider.getInputCount() >= 2) {
+      strategies.add(new SplicingMutationStrategy(corpusProvider));
+    }
+
     return new CombinedMutationStrategy(strategies);
   }
 

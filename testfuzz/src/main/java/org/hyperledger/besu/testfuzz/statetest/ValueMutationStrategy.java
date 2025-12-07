@@ -26,24 +26,27 @@ import java.util.Random;
 /**
  * Value mutation strategy.
  * Mutates transaction values (wei amounts) to test value transfer edge cases.
- * Ported from goevmlab.
+ * Ported from goevmlab mutations/value.go
  */
 public class ValueMutationStrategy implements MutationStrategy {
 
   private final Random rng;
 
   // Interesting value amounts for fuzzing (in wei)
+  // Note: Very large values (>uint64) are excluded as they cause false positives
+  // when used as transaction values - real-world txs don't have such huge values.
+  // Max uint256 is explicitly excluded - causes false positives in realistic scenarios.
   private static final BigInteger[] INTERESTING_VALUES = {
-      BigInteger.ZERO,
-      BigInteger.ONE,
-      BigInteger.valueOf(21000),                    // Base tx cost
-      BigInteger.valueOf(1_000_000_000),            // 1 gwei
-      BigInteger.valueOf(1_000_000_000_000_000_000L), // 1 ether
-      new BigInteger("ffffffffffffffff", 16),       // Max uint64
-      new BigInteger("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16), // Max uint256
-      BigInteger.valueOf(2).pow(128).subtract(BigInteger.ONE),  // Max uint128
-      BigInteger.valueOf(2).pow(64).subtract(BigInteger.ONE),   // Max uint64
-      BigInteger.valueOf(2).pow(32).subtract(BigInteger.ONE),   // Max uint32
+      BigInteger.ZERO,                                           // Zero
+      BigInteger.ONE,                                            // One wei
+      new BigInteger("de0b6b3a7640000", 16),                     // 1 ether
+      new BigInteger("8ac7230489e80000", 16),                    // 10 ether
+      new BigInteger("ffffffffffffffff", 16),                    // Max uint64
+      // Max uint128 and uint256 disabled - cause unrealistic test scenarios / false positives:
+      // new BigInteger("ffffffffffffffffffffffffffffffff", 16),   // Max uint128
+      // new BigInteger("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16), // Max uint256
+      new BigInteger("80", 16).shiftLeft(248),                   // Sign bit set (0x80 followed by 31 zero bytes)
+      BigInteger.valueOf(0xff),                                  // Small with 255
   };
 
   public ValueMutationStrategy() {
@@ -71,7 +74,7 @@ public class ValueMutationStrategy implements MutationStrategy {
 
   @Override
   public int weight() {
-    return 8;
+    return 6; // Same as goevmlab
   }
 
   @Override

@@ -10,13 +10,11 @@ The state test fuzzer processes state tests directly in-memory, bypassing IPC ov
 
 - **Direct Transaction Processing**: Executes state tests using Besu's `TransactionProcessor` directly
 - **Multi-threaded Execution**: Scales with available CPU cores
-- **Goevmlab Mutation Strategies**:
-  - Bytecode mutations (random byte, increment/decrement, bit flip)
-  - Gas mutations (interesting values, boundary conditions)
-  - Value mutations (wei amounts, overflow detection)
-  - Calldata mutations
-  - Opcode-smart mutations (EVM-aware changes)
-  - Havoc mode (AFL-style stacked random mutations)
+- **Goevmlab Mutation Strategies** (15 strategies ported from Go):
+  - **Core**: bytecode, opcode-smart, gas, value, calldata, storage
+  - **AFL-inspired**: arithmetic (±1-35), boundary values, dictionary injection, bit-flipping
+  - **Structural**: block operations (delete/clone/insert/overwrite), transaction fields, account fields
+  - **Advanced**: havoc (2-128 stacked mutations), splicing (corpus-based bytecode combining)
 - **JaCoCo Coverage Guidance**: Optional coverage-guided fuzzing with `--guidance-regexp`
 - **Crash Collection**: Automatically saves crash-inducing inputs with metadata
 
@@ -81,16 +79,45 @@ Typical throughput with 4 workers on modern hardware:
 
 ## Mutation Strategies
 
+All 15 strategies from goevmlab have been ported to Java:
+
+### Core Strategies
+
 | Strategy | Weight | Description |
 |----------|--------|-------------|
 | bytecode | 10 | Mutates contract bytecode (respecting PUSH operands) |
-| gas | 8 | Tests gas boundary conditions |
-| value | 8 | Mutates transaction value (wei amounts) |
+| opcode-smart | 10 | EVM-aware opcode mutations (stack, memory, control flow) |
+| gas | 8 | Tests gas boundary conditions (21000, block gas limit, etc.) |
+| value | 6 | Mutates transaction value (wei amounts, excludes max uint256) |
 | calldata | 8 | Mutates transaction input data |
-| opcode-smart | 10 | EVM-aware opcode mutations |
-| havoc | 12 | AFL-style stacked random mutations |
+| storage | 6 | Mutates pre-state storage keys/values |
 
-Strategies are selected randomly based on their weights.
+### AFL-Inspired Strategies
+
+| Strategy | Weight | Description |
+|----------|--------|-------------|
+| arithmetic | 6 | AFL-style ±1-35 mutations on numeric fields |
+| boundary | 6 | Replaces values with interesting boundaries (gas costs, etc.) |
+| dictionary | 6 | Injects EVM tokens (opcodes, precompiles, selectors) |
+| bitflip | 6 | AFL bit-flipping stages (FLIP1/2/4/8) |
+
+### Structural Strategies
+
+| Strategy | Weight | Description |
+|----------|--------|-------------|
+| blockops | 6 | Block operations: delete, clone, insert, overwrite |
+| txfields | 6 | Mutates tx nonce, gasPrice, to address, EIP-1559 fields |
+| accountfields | 6 | Mutates account balance and nonce in pre-state |
+
+### Advanced Strategies
+
+| Strategy | Weight | Description |
+|----------|--------|-------------|
+| havoc | 5 | AFL havoc stage: stacks 2-128 random mutations |
+| splicing | 4 | Combines bytecode from different corpus inputs (requires >= 2 corpus entries) |
+
+Strategies are selected randomly based on their weights. The combined strategy automatically
+enables splicing when the corpus has at least 2 entries.
 
 ## Output
 
@@ -123,16 +150,25 @@ StateTestFuzzSubCommand (CLI interface)
     |       |
     |       +-- StateTestExecutor (direct tx processing)
     |       +-- CombinedMutationStrategy (mutation orchestration)
-    |               |
-    |               +-- BytecodeMutationStrategy
-    |               +-- GasMutationStrategy
-    |               +-- ValueMutationStrategy
-    |               +-- CalldataMutationStrategy
-    |               +-- OpcodeSmartMutationStrategy
-    |               +-- HavocMutationStrategy
+    |       |       |
+    |       |       +-- Core: Bytecode, OpcodesSmart, Gas, Value, Calldata, Storage
+    |       |       +-- AFL: Arithmetic, Boundary, Dictionary, BitFlip
+    |       |       +-- Structural: BlockOps, TxFields, AccountFields
+    |       |       +-- Advanced: Havoc (delegates to all above), Splicing
+    |       |
+    |       +-- StateTestCorpusProvider (thread-safe corpus access for splicing)
     |
     +-- Fuzzer (JaCoCo-guided loop, when --guidance-regexp is set)
 ```
+
+## Thread Safety
+
+The fuzzer is designed for safe multi-threaded execution:
+
+- **Corpus**: Loaded once at startup, then read-only access via `StateTestCorpusProvider`
+- **Workers**: Each worker thread gets its own `StateTestExecutor` and `CombinedMutationStrategy`
+- **Mutations**: All mutations create new byte arrays (never modify corpus entries in-place)
+- **Random**: Uses `ThreadLocalRandom` for thread-safe random number generation
 
 ## Comparison with Go Fuzzer
 

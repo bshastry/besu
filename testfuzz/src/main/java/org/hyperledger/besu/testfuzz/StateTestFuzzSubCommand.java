@@ -17,6 +17,7 @@ package org.hyperledger.besu.testfuzz;
 import org.hyperledger.besu.testfuzz.javafuzz.Fuzzer;
 import org.hyperledger.besu.testfuzz.statetest.CombinedMutationStrategy;
 import org.hyperledger.besu.testfuzz.statetest.MutationStrategy;
+import org.hyperledger.besu.testfuzz.statetest.StateTestCorpusProvider;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -284,7 +285,16 @@ public class StateTestFuzzSubCommand implements Runnable {
   private void runWorker(final int workerId, final Instant deadline) {
     // Each worker gets its own executor and mutator (thread-local)
     StateTestExecutor workerExecutor = new StateTestExecutor(fork);
-    CombinedMutationStrategy workerMutator = CombinedMutationStrategy.createDefault();
+
+    // Create mutator with splicing if corpus is available
+    CombinedMutationStrategy workerMutator;
+    if (corpus.size() >= 2) {
+      StateTestCorpusProvider corpusProvider = new StateTestCorpusProvider(corpus);
+      workerMutator = CombinedMutationStrategy.createWithSplicing(corpusProvider);
+    } else {
+      workerMutator = CombinedMutationStrategy.createDefault();
+    }
+
     Random rng = new Random(System.nanoTime() + workerId);
 
     while (!stopFlag.get() && (deadline == null || Instant.now().isBefore(deadline))) {
