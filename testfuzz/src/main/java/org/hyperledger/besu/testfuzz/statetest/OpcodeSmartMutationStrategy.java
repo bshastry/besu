@@ -14,19 +14,18 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+
 /**
- * Opcode-aware mutation strategy.
- * Knows about opcode semantics and mutates to related opcodes.
+ * Opcode-aware mutation strategy. Knows about opcode semantics and mutates to related opcodes.
  * Ported from goevmlab.
  */
 public class OpcodeSmartMutationStrategy implements MutationStrategy {

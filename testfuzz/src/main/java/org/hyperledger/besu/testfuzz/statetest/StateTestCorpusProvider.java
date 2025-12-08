@@ -19,15 +19,15 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Corpus provider implementation for state test fuzzing.
- * Wraps a list of corpus entries and provides random access for splicing mutations.
+ * Corpus provider implementation for state test fuzzing. Wraps a list of corpus entries and
+ * provides random access for splicing mutations.
  *
- * <p>Thread Safety: This implementation is thread-safe for concurrent read access.
- * The underlying corpus list is wrapped as unmodifiable to prevent accidental modification.
- * Workers only read from the corpus - they never write to it.
+ * <p>Thread Safety: This implementation is thread-safe for concurrent read access. The underlying
+ * corpus list is wrapped as unmodifiable to prevent accidental modification. Workers only read from
+ * the corpus - they never write to it.
  *
- * <p>Note: The byte[] arrays returned by getRandomInput() should be treated as read-only
- * or cloned before modification to avoid corrupting the corpus.
+ * <p>Note: The byte[] arrays returned by getRandomInput() should be treated as read-only or cloned
+ * before modification to avoid corrupting the corpus.
  */
 public class StateTestCorpusProvider implements SplicingMutationStrategy.CorpusProvider {
 
@@ -35,8 +35,8 @@ public class StateTestCorpusProvider implements SplicingMutationStrategy.CorpusP
   private final int size; // Cached size for thread-safety
 
   /**
-   * Creates a new StateTestCorpusProvider wrapping the given corpus.
-   * The corpus list is wrapped as unmodifiable to ensure thread-safety.
+   * Creates a new StateTestCorpusProvider wrapping the given corpus. The corpus list is wrapped as
+   * unmodifiable to ensure thread-safety.
    *
    * @param corpus the list of corpus entries (JSON byte arrays)
    */

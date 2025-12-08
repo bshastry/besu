@@ -33,12 +33,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Fuzz target for Ethereum state tests.
- * Uses custom mutation strategies ported from goevmlab and
+ * Fuzz target for Ethereum state tests. Uses custom mutation strategies ported from goevmlab and
  * directly executes tests through Besu's transaction processor.
  *
- * <p>This target is designed for use with both the internal javafuzz
- * framework (JaCoCo-guided) and can be adapted for Jazzer.
+ * <p>This target is designed for use with both the internal javafuzz framework (JaCoCo-guided) and
+ * can be adapted for Jazzer.
  */
 public class StateTestFuzzTarget implements FuzzTarget {
 
@@ -72,16 +71,18 @@ public class StateTestFuzzTarget implements FuzzTarget {
     if (corpus.size() >= 2) {
       StateTestCorpusProvider corpusProvider = new StateTestCorpusProvider(corpus);
       this.mutator = CombinedMutationStrategy.createWithSplicing(corpusProvider);
-      LOG.info("StateTestFuzzTarget initialized with {} corpus entries (splicing enabled)", corpus.size());
+      LOG.info(
+          "StateTestFuzzTarget initialized with {} corpus entries (splicing enabled)",
+          corpus.size());
     } else {
       this.mutator = CombinedMutationStrategy.createDefault();
-      LOG.info("StateTestFuzzTarget initialized with {} corpus entries (splicing disabled - need >= 2)", corpus.size());
+      LOG.info(
+          "StateTestFuzzTarget initialized with {} corpus entries (splicing disabled - need >= 2)",
+          corpus.size());
     }
   }
 
-  /**
-   * Creates a new StateTestFuzzTarget with default settings.
-   */
+  /** Creates a new StateTestFuzzTarget with default settings. */
   public StateTestFuzzTarget() {
     this(null, "Prague");
   }
@@ -129,8 +130,7 @@ public class StateTestFuzzTarget implements FuzzTarget {
   }
 
   /**
-   * Main fuzz entry point.
-   * Called by the fuzzing framework with random/mutated input.
+   * Main fuzz entry point. Called by the fuzzing framework with random/mutated input.
    *
    * @param data the input data (can be random bytes or corpus entry)
    */
@@ -176,9 +176,7 @@ public class StateTestFuzzTarget implements FuzzTarget {
     }
   }
 
-  /**
-   * Selects a corpus entry and mutates it using fuzzer-provided entropy.
-   */
+  /** Selects a corpus entry and mutates it using fuzzer-provided entropy. */
   private byte[] mutateCorpusEntry(final byte[] entropy) {
     if (corpus.isEmpty()) {
       return entropy;
@@ -206,7 +204,8 @@ public class StateTestFuzzTarget implements FuzzTarget {
     }
     // Skip whitespace and check for '{'
     int i = 0;
-    while (i < data.length && (data[i] == ' ' || data[i] == '\t' || data[i] == '\n' || data[i] == '\r')) {
+    while (i < data.length
+        && (data[i] == ' ' || data[i] == '\t' || data[i] == '\n' || data[i] == '\r')) {
       i++;
     }
     if (i >= data.length) {
@@ -223,10 +222,10 @@ public class StateTestFuzzTarget implements FuzzTarget {
       }
       return result;
     }
-    return ((data[offset] & 0xFF) << 24) |
-        ((data[offset + 1] & 0xFF) << 16) |
-        ((data[offset + 2] & 0xFF) << 8) |
-        (data[offset + 3] & 0xFF);
+    return ((data[offset] & 0xFF) << 24)
+        | ((data[offset + 1] & 0xFF) << 16)
+        | ((data[offset + 2] & 0xFF) << 8)
+        | (data[offset + 3] & 0xFF);
   }
 
   /**
@@ -251,8 +250,7 @@ public class StateTestFuzzTarget implements FuzzTarget {
         mutationFailures.get(),
         executionCrashes.get(),
         corpus.size(),
-        executor.getStats()
-    );
+        executor.getStats());
   }
 
   /**

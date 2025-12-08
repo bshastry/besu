@@ -14,19 +14,18 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
+import java.math.BigInteger;
+import java.util.Map;
+import java.util.Random;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 
-import java.math.BigInteger;
-import java.util.Map;
-import java.util.Random;
-
 /**
- * Value mutation strategy.
- * Mutates transaction values (wei amounts) to test value transfer edge cases.
- * Ported from goevmlab mutations/value.go
+ * Value mutation strategy. Mutates transaction values (wei amounts) to test value transfer edge
+ * cases. Ported from goevmlab mutations/value.go
  */
 public class ValueMutationStrategy implements MutationStrategy {
 
@@ -37,16 +36,17 @@ public class ValueMutationStrategy implements MutationStrategy {
   // when used as transaction values - real-world txs don't have such huge values.
   // Max uint256 is explicitly excluded - causes false positives in realistic scenarios.
   private static final BigInteger[] INTERESTING_VALUES = {
-      BigInteger.ZERO,                                           // Zero
-      BigInteger.ONE,                                            // One wei
-      new BigInteger("de0b6b3a7640000", 16),                     // 1 ether
-      new BigInteger("8ac7230489e80000", 16),                    // 10 ether
-      new BigInteger("ffffffffffffffff", 16),                    // Max uint64
-      // Max uint128 and uint256 disabled - cause unrealistic test scenarios / false positives:
-      // new BigInteger("ffffffffffffffffffffffffffffffff", 16),   // Max uint128
-      // new BigInteger("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16), // Max uint256
-      new BigInteger("80", 16).shiftLeft(248),                   // Sign bit set (0x80 followed by 31 zero bytes)
-      BigInteger.valueOf(0xff),                                  // Small with 255
+    BigInteger.ZERO, // Zero
+    BigInteger.ONE, // One wei
+    new BigInteger("de0b6b3a7640000", 16), // 1 ether
+    new BigInteger("8ac7230489e80000", 16), // 10 ether
+    new BigInteger("ffffffffffffffff", 16), // Max uint64
+    // Max uint128 and uint256 disabled - cause unrealistic test scenarios / false positives:
+    // new BigInteger("ffffffffffffffffffffffffffffffff", 16),   // Max uint128
+    // new BigInteger("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16), //
+    // Max uint256
+    new BigInteger("80", 16).shiftLeft(248), // Sign bit set (0x80 followed by 31 zero bytes)
+    BigInteger.valueOf(0xff), // Small with 255
   };
 
   public ValueMutationStrategy() {

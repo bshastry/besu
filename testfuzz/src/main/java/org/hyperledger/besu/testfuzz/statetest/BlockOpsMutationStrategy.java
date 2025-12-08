@@ -14,20 +14,18 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+
 /**
- * BlockOps mutation strategy.
- * Performs AFL-style block-level mutations on bytecode.
- * AFL uses these extensively in its deterministic and havoc stages for
- * operations like delete, clone, insert, and overwrite.
- * Ported from goevmlab mutations/blockops.go
+ * BlockOps mutation strategy. Performs AFL-style block-level mutations on bytecode. AFL uses these
+ * extensively in its deterministic and havoc stages for operations like delete, clone, insert, and
+ * overwrite. Ported from goevmlab mutations/blockops.go
  */
 public class BlockOpsMutationStrategy implements MutationStrategy {
 

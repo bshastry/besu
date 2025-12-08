@@ -19,11 +19,9 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * Havoc mutation strategy - AFL's "havoc" stage.
- * Applies multiple stacked mutations using all base strategies (AFL havoc stage).
- * This is AFL's most effective mutation stage for finding deep bugs.
- * It stacks 2-128 random mutations per test case, dramatically increasing
- * mutation diversity.
+ * Havoc mutation strategy - AFL's "havoc" stage. Applies multiple stacked mutations using all base
+ * strategies (AFL havoc stage). This is AFL's most effective mutation stage for finding deep bugs.
+ * It stacks 2-128 random mutations per test case, dramatically increasing mutation diversity.
  * Ported from goevmlab mutations/havoc.go
  *
  * <p>Note: HavocStrategy is not included in its own base strategies to prevent recursion.
@@ -50,8 +48,8 @@ public class HavocMutationStrategy implements MutationStrategy {
   }
 
   /**
-   * Creates a new HavocMutationStrategy with custom strategies.
-   * This is useful for testing or when you want to limit the mutation pool.
+   * Creates a new HavocMutationStrategy with custom strategies. This is useful for testing or when
+   * you want to limit the mutation pool.
    *
    * @param strategies the list of base strategies
    */
@@ -72,8 +70,8 @@ public class HavocMutationStrategy implements MutationStrategy {
   }
 
   /**
-   * Builds the default list of base strategies.
-   * Note: HavocStrategy itself is NOT included to prevent infinite recursion.
+   * Builds the default list of base strategies. Note: HavocStrategy itself is NOT included to
+   * prevent infinite recursion.
    */
   private static List<MutationStrategy> buildBaseStrategies() {
     List<MutationStrategy> strategies = new ArrayList<>();
@@ -146,8 +144,8 @@ public class HavocMutationStrategy implements MutationStrategy {
   }
 
   /**
-   * Returns the list of base strategies used by this havoc strategy.
-   * This is useful for testing to verify no infinite recursion.
+   * Returns the list of base strategies used by this havoc strategy. This is useful for testing to
+   * verify no infinite recursion.
    *
    * @return the list of strategies
    */

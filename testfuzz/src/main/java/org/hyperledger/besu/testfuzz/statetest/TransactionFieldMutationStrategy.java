@@ -14,20 +14,18 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+
 /**
- * Transaction field mutation strategy.
- * Mutates transaction fields that aren't covered by existing strategies
- * (nonce, gasPrice, to, maxFeePerGas, etc.)
- * Ported from goevmlab mutations/txfields.go
+ * Transaction field mutation strategy. Mutates transaction fields that aren't covered by existing
+ * strategies (nonce, gasPrice, to, maxFeePerGas, etc.) Ported from goevmlab mutations/txfields.go
  */
 public class TransactionFieldMutationStrategy implements MutationStrategy {
 
@@ -35,32 +33,34 @@ public class TransactionFieldMutationStrategy implements MutationStrategy {
 
   // Interesting 'to' addresses for mutation
   private static final String[] INTERESTING_TO_ADDRESSES = {
-      "",                                           // Empty (CREATE)
-      "0x0000000000000000000000000000000000000000", // Zero address
-      "0x0000000000000000000000000000000000000001", // ECRECOVER
-      "0x0000000000000000000000000000000000000002", // SHA256
-      "0x0000000000000000000000000000000000000003", // RIPEMD160
-      "0x0000000000000000000000000000000000000004", // IDENTITY
-      "0x0000000000000000000000000000000000000005", // MODEXP
-      "0x0000000000000000000000000000000000000006", // BN254_ADD
-      "0x0000000000000000000000000000000000000007", // BN254_MUL
-      "0x0000000000000000000000000000000000000008", // BN254_PAIRING
-      "0x0000000000000000000000000000000000000009", // BLAKE2F
-      "0x000000000000000000000000000000000000000a", // KZG_POINT_EVAL
-      "0xffffffffffffffffffffffffffffffffffffffff", // Max address
+    "", // Empty (CREATE)
+    "0x0000000000000000000000000000000000000000", // Zero address
+    "0x0000000000000000000000000000000000000001", // ECRECOVER
+    "0x0000000000000000000000000000000000000002", // SHA256
+    "0x0000000000000000000000000000000000000003", // RIPEMD160
+    "0x0000000000000000000000000000000000000004", // IDENTITY
+    "0x0000000000000000000000000000000000000005", // MODEXP
+    "0x0000000000000000000000000000000000000006", // BN254_ADD
+    "0x0000000000000000000000000000000000000007", // BN254_MUL
+    "0x0000000000000000000000000000000000000008", // BN254_PAIRING
+    "0x0000000000000000000000000000000000000009", // BLAKE2F
+    "0x000000000000000000000000000000000000000a", // KZG_POINT_EVAL
+    "0xffffffffffffffffffffffffffffffffffffffff", // Max address
   };
 
   // Interesting nonce values for mutation
   private static final String[] INTERESTING_NONCES = {
-      "0x0", "0x1", "0xff", "0xffff", "0xffffffff", "0xffffffffffffffff",
+    "0x0", "0x1", "0xff", "0xffff", "0xffffffff", "0xffffffffffffffff",
   };
 
   // Interesting gas price values for mutation
   private static final String[] INTERESTING_GAS_PRICES = {
-      "0x0", "0x1", "0x3b9aca00",   // 0, 1, 1 gwei
-      "0x2540be400",                // 10 gwei
-      "0x174876e800",               // 100 gwei
-      "0xffffffffffffffff",         // Max uint64
+    "0x0",
+    "0x1",
+    "0x3b9aca00", // 0, 1, 1 gwei
+    "0x2540be400", // 10 gwei
+    "0x174876e800", // 100 gwei
+    "0xffffffffffffffff", // Max uint64
   };
 
   /** Creates a new TransactionFieldMutationStrategy. */

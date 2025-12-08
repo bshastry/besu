@@ -14,19 +14,18 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+
 /**
- * Account field mutation strategy.
- * Mutates account balance and nonce in pre-state.
- * Ported from goevmlab mutations/accountfields.go
+ * Account field mutation strategy. Mutates account balance and nonce in pre-state. Ported from
+ * goevmlab mutations/accountfields.go
  */
 public class AccountFieldMutationStrategy implements MutationStrategy {
 
@@ -35,17 +34,17 @@ public class AccountFieldMutationStrategy implements MutationStrategy {
   // Interesting balance values for mutation
   // Note: U256_MAX excluded - causes false positives (REVM aborts on balance overflow, geth wraps)
   private static final String[] INTERESTING_BALANCES = {
-      "0x0",                 // Zero
-      "0x1",                 // 1 wei
-      "0xde0b6b3a7640000",   // 1 ether
-      "0x6f05b59d3b20000",   // 0.5 ether
-      "0x1bc16d674ec80000",  // 2 ether
-      "0x56bc75e2d63100000", // 100 ether
+    "0x0", // Zero
+    "0x1", // 1 wei
+    "0xde0b6b3a7640000", // 1 ether
+    "0x6f05b59d3b20000", // 0.5 ether
+    "0x1bc16d674ec80000", // 2 ether
+    "0x56bc75e2d63100000", // 100 ether
   };
 
   // Interesting nonce values for account mutation
   private static final String[] INTERESTING_ACCOUNT_NONCES = {
-      "0x0", "0x1", "0xff", "0x100", "0xffff", "0xffffffff",
+    "0x0", "0x1", "0xff", "0x100", "0xffff", "0xffffffff",
   };
 
   /** Creates a new AccountFieldMutationStrategy. */

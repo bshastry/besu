@@ -41,7 +41,11 @@ import picocli.CommandLine.Command;
     optionListHeading = "%nOptions:%n",
     footerHeading = "%n",
     footer = "Hyperledger Besu is licensed under the Apache License 2.0",
-    subcommands = {EofContainerSubCommand.class, P256VerifySubCommand.class, StateTestFuzzSubCommand.class})
+    subcommands = {
+      EofContainerSubCommand.class,
+      P256VerifySubCommand.class,
+      StateTestFuzzSubCommand.class
+    })
 @SuppressWarnings("java:S106")
 public class BesuFuzzCommand implements Runnable {
 

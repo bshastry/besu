@@ -14,20 +14,16 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Random;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Random;
-
-/**
- * Calldata mutation strategy.
- * Mutates transaction input data (calldata).
- * Ported from goevmlab.
- */
+/** Calldata mutation strategy. Mutates transaction input data (calldata). Ported from goevmlab. */
 public class CalldataMutationStrategy implements MutationStrategy {
 
   private final Random rng;

@@ -52,3 +52,49 @@ cd testfuzz/build/install/BesuFuzz
 
 The P256 fuzzer tests multiple mutation strategies including bit flips, boundary values,
 curve attacks, and signature malleability. See `P256_FUZZER_README.md` for detailed documentation.
+
+## state-test-fuzz
+
+Performs coverage-guided fuzzing of the EVM using Ethereum state test JSON files. Supports
+both single-threaded and parallel fuzzing modes with JaCoCo coverage tracking.
+
+### Parallel Coverage-Guided Fuzzing (Recommended):
+
+The `--parallel-guided` mode combines multi-threaded execution with shared coverage guidance,
+achieving high throughput while intelligently prioritizing inputs that discover new code paths.
+
+```shell
+# Build the fuzzer with JaCoCo agent
+./testfuzz/scripts/clean-build-fuzzer.sh
+
+# Run parallel coverage-guided fuzzing
+./testfuzz/build/install/BesuFuzz/bin/BesuFuzz state-test-fuzz \
+  --corpus-dir=path/to/corpus \
+  --fork=Osaka \
+  --duration=60s \
+  --workers=4 \
+  --parallel-guided \
+  --guidance-regexp="org.hyperledger.besu.evm.*"
+```
+
+### Key Features:
+
+- **AFL-style energy scheduling**: Prioritizes inputs that discover new coverage
+- **Thread-safe coverage tracking**: All workers contribute to shared coverage bitmap
+- **Automatic crash deduplication**: Saves unique crashes with metadata
+- **Multiple mutation strategies**: Bytecode, transaction, storage, gas, and more
+
+### CLI Options:
+
+| Option | Description |
+|--------|-------------|
+| `--corpus-dir` | Directory containing seed corpus (JSON state tests) |
+| `--fork` | EVM fork to target (e.g., Prague, Osaka) |
+| `--duration` | How long to run (e.g., 30s, 5m, 1h) |
+| `--workers` | Number of parallel workers (default: CPU cores) |
+| `--parallel-guided` | Enable parallel coverage-guided mode |
+| `--guidance-regexp` | Regex to filter which classes count for coverage |
+| `--crash-dir` | Directory to save crash files (default: crashes/) |
+| `--new-corpus-dir` | Directory to save new interesting inputs |
+
+See `PARALLEL_FUZZER_ARCHITECTURE.md` for implementation details.

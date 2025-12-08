@@ -14,29 +14,27 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.tuweni.bytes.Bytes;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.tuweni.bytes.Bytes;
+
 /**
- * Helper class for JSON manipulation in mutation strategies.
- * Provides utilities for parsing and modifying state test JSON.
+ * Helper class for JSON manipulation in mutation strategies. Provides utilities for parsing and
+ * modifying state test JSON.
  */
 public class JsonMutationHelper {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  /**
-   * Parses JSON bytes into a JsonNode.
-   */
+  /** Parses JSON bytes into a JsonNode. */
   public static JsonNode parse(final byte[] data) throws MutationStrategy.MutationException {
     try {
       return MAPPER.readTree(data);
@@ -45,22 +43,22 @@ public class JsonMutationHelper {
     }
   }
 
-  /**
-   * Serializes a JsonNode back to bytes.
-   */
+  /** Serializes a JsonNode back to bytes. */
   public static byte[] serialize(final JsonNode node) throws MutationStrategy.MutationException {
     try {
       return MAPPER.writeValueAsBytes(node);
     } catch (JsonProcessingException e) {
-      throw new MutationStrategy.MutationException("Failed to serialize JSON: " + e.getMessage(), e);
+      throw new MutationStrategy.MutationException(
+          "Failed to serialize JSON: " + e.getMessage(), e);
     }
   }
 
   /**
-   * Gets the first test name and data from the root object.
-   * State tests have format: { "TestName": { ... } }
+   * Gets the first test name and data from the root object. State tests have format: { "TestName":
+   * { ... } }
    */
-  public static Map.Entry<String, JsonNode> getFirstTest(final JsonNode root) throws MutationStrategy.MutationException {
+  public static Map.Entry<String, JsonNode> getFirstTest(final JsonNode root)
+      throws MutationStrategy.MutationException {
     if (!root.isObject() || root.isEmpty()) {
       throw new MutationStrategy.MutationException("Invalid test format: not an object or empty");
     }
@@ -73,10 +71,9 @@ public class JsonMutationHelper {
     return fields.next();
   }
 
-  /**
-   * Gets the 'pre' state from a test node.
-   */
-  public static ObjectNode getPreState(final JsonNode test) throws MutationStrategy.MutationException {
+  /** Gets the 'pre' state from a test node. */
+  public static ObjectNode getPreState(final JsonNode test)
+      throws MutationStrategy.MutationException {
     JsonNode pre = test.get("pre");
     if (pre == null || !pre.isObject()) {
       throw new MutationStrategy.MutationException("No 'pre' state found");
@@ -84,10 +81,9 @@ public class JsonMutationHelper {
     return (ObjectNode) pre;
   }
 
-  /**
-   * Gets the 'transaction' object from a test node.
-   */
-  public static ObjectNode getTransaction(final JsonNode test) throws MutationStrategy.MutationException {
+  /** Gets the 'transaction' object from a test node. */
+  public static ObjectNode getTransaction(final JsonNode test)
+      throws MutationStrategy.MutationException {
     JsonNode tx = test.get("transaction");
     if (tx == null || !tx.isObject()) {
       throw new MutationStrategy.MutationException("No 'transaction' found");
@@ -95,9 +91,7 @@ public class JsonMutationHelper {
     return (ObjectNode) tx;
   }
 
-  /**
-   * Gets all accounts with code from the pre state.
-   */
+  /** Gets all accounts with code from the pre state. */
   public static List<AccountWithCode> getAccountsWithCode(final ObjectNode pre) {
     List<AccountWithCode> accounts = new ArrayList<>();
 
@@ -126,9 +120,7 @@ public class JsonMutationHelper {
     return accounts;
   }
 
-  /**
-   * Converts a hex string to bytes.
-   */
+  /** Converts a hex string to bytes. */
   public static byte[] hexToBytes(final String hex) {
     if (hex == null || hex.isEmpty()) {
       return new byte[0];
@@ -151,9 +143,7 @@ public class JsonMutationHelper {
     }
   }
 
-  /**
-   * Converts bytes to a hex string with 0x prefix.
-   */
+  /** Converts bytes to a hex string with 0x prefix. */
   public static String bytesToHex(final byte[] bytes) {
     if (bytes == null || bytes.length == 0) {
       return "0x";
@@ -161,9 +151,7 @@ public class JsonMutationHelper {
     return Bytes.wrap(bytes).toHexString();
   }
 
-  /**
-   * Parses a hex string as an unsigned long.
-   */
+  /** Parses a hex string as an unsigned long. */
   public static long hexToLong(final String hex) {
     if (hex == null || hex.isEmpty()) {
       return 0;
@@ -181,16 +169,12 @@ public class JsonMutationHelper {
     }
   }
 
-  /**
-   * Formats a long as a hex string with 0x prefix.
-   */
+  /** Formats a long as a hex string with 0x prefix. */
   public static String longToHex(final long value) {
     return "0x" + Long.toHexString(value);
   }
 
-  /**
-   * Finds positions in bytecode that are opcodes (not PUSH operands).
-   */
+  /** Finds positions in bytecode that are opcodes (not PUSH operands). */
   public static List<Integer> findMutablePositions(final byte[] code) {
     List<Integer> positions = new ArrayList<>();
     int i = 0;
@@ -211,9 +195,7 @@ public class JsonMutationHelper {
     return positions;
   }
 
-  /**
-   * Selects a random element from a list.
-   */
+  /** Selects a random element from a list. */
   public static <T> T randomElement(final List<T> list, final Random rng) {
     if (list == null || list.isEmpty()) {
       return null;
@@ -221,9 +203,7 @@ public class JsonMutationHelper {
     return list.get(rng.nextInt(list.size()));
   }
 
-  /**
-   * Represents an account with bytecode.
-   */
+  /** Represents an account with bytecode. */
   public static class AccountWithCode {
     private final String address;
     private final byte[] code;

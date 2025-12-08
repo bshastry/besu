@@ -14,20 +14,19 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+
 /**
- * Storage mutation strategy.
- * Mutates pre-state storage to test state management.
- * Ported from goevmlab mutations/storage.go
+ * Storage mutation strategy. Mutates pre-state storage to test state management. Ported from
+ * goevmlab mutations/storage.go
  */
 public class StorageMutationStrategy implements MutationStrategy {
 
@@ -35,20 +34,20 @@ public class StorageMutationStrategy implements MutationStrategy {
 
   // Interesting storage slots (32 bytes each)
   private static final String[] INTERESTING_SLOTS = {
-      "0x0000000000000000000000000000000000000000000000000000000000000000", // Slot 0
-      "0x0000000000000000000000000000000000000000000000000000000000000001", // Slot 1
-      "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Max slot
-      "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe", // Max - 1
-      "0x00000000000000000000000000000000000000000000000000000000000000ff", // Slot 255
+    "0x0000000000000000000000000000000000000000000000000000000000000000", // Slot 0
+    "0x0000000000000000000000000000000000000000000000000000000000000001", // Slot 1
+    "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Max slot
+    "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe", // Max - 1
+    "0x00000000000000000000000000000000000000000000000000000000000000ff", // Slot 255
   };
 
   // Interesting storage values (32 bytes each)
   private static final String[] INTERESTING_STORAGE_VALUES = {
-      "0x0000000000000000000000000000000000000000000000000000000000000000", // Zero (delete)
-      "0x0000000000000000000000000000000000000000000000000000000000000001", // Non-zero minimal
-      "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Max value
-      "0xdededededededededededededededededededededededededededededededede", // Pattern
-      "0x8000000000000000000000000000000000000000000000000000000000000000", // Sign bit
+    "0x0000000000000000000000000000000000000000000000000000000000000000", // Zero (delete)
+    "0x0000000000000000000000000000000000000000000000000000000000000001", // Non-zero minimal
+    "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Max value
+    "0xdededededededededededededededededededededededededededededededede", // Pattern
+    "0x8000000000000000000000000000000000000000000000000000000000000000", // Sign bit
   };
 
   /** Creates a new StorageMutationStrategy. */

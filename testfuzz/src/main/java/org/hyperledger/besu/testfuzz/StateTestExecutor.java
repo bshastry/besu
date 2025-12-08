@@ -49,9 +49,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Executes Ethereum state tests directly without IPC overhead.
- * This class provides direct access to Besu's transaction processor
- * for high-performance fuzzing.
+ * Executes Ethereum state tests directly without IPC overhead. This class provides direct access to
+ * Besu's transaction processor for high-performance fuzzing.
  */
 public class StateTestExecutor {
 
@@ -69,9 +68,7 @@ public class StateTestExecutor {
   private final AtomicLong executionErrors = new AtomicLong(0);
   private final AtomicLong skippedTests = new AtomicLong(0);
 
-  /**
-   * Result of executing a state test.
-   */
+  /** Result of executing a state test. */
   public static class ExecutionResult {
     private final boolean success;
     private final String stateRoot;
@@ -148,40 +145,48 @@ public class StateTestExecutor {
      *
      * @return true if successful
      */
-    public boolean isSuccess() { return success; }
+    public boolean isSuccess() {
+      return success;
+    }
 
     /**
      * Returns the state root.
      *
      * @return the state root
      */
-    public String getStateRoot() { return stateRoot; }
+    public String getStateRoot() {
+      return stateRoot;
+    }
 
     /**
      * Returns the error message.
      *
      * @return the error message
      */
-    public String getError() { return error; }
+    public String getError() {
+      return error;
+    }
 
     /**
      * Returns the gas used.
      *
      * @return the gas used
      */
-    public long getGasUsed() { return gasUsed; }
+    public long getGasUsed() {
+      return gasUsed;
+    }
 
     /**
      * Returns true if this was a crash.
      *
      * @return true if crashed
      */
-    public boolean isCrashed() { return crashed; }
+    public boolean isCrashed() {
+      return crashed;
+    }
   }
 
-  /**
-   * Creates a new StateTestExecutor with default fork (Prague).
-   */
+  /** Creates a new StateTestExecutor with default fork (Prague). */
   public StateTestExecutor() {
     this("Prague");
   }
@@ -196,10 +201,11 @@ public class StateTestExecutor {
     SignatureAlgorithmFactory.setDefaultInstance();
 
     this.objectMapper = new ObjectMapper();
-    this.stateTestType = objectMapper.getTypeFactory()
-        .constructParametricType(Map.class, String.class, GeneralStateTestCaseSpec.class);
-    this.protocolSchedules = ReferenceTestProtocolSchedules.create(
-        EvmConfiguration.DEFAULT);
+    this.stateTestType =
+        objectMapper
+            .getTypeFactory()
+            .constructParametricType(Map.class, String.class, GeneralStateTestCaseSpec.class);
+    this.protocolSchedules = ReferenceTestProtocolSchedules.create(EvmConfiguration.DEFAULT);
     this.defaultFork = defaultFork;
   }
 
@@ -241,7 +247,8 @@ public class StateTestExecutor {
         continue;
       }
 
-      for (Map.Entry<String, List<GeneralStateTestCaseEipSpec>> forkEntry : finalStateSpecs.entrySet()) {
+      for (Map.Entry<String, List<GeneralStateTestCaseEipSpec>> forkEntry :
+          finalStateSpecs.entrySet()) {
         List<GeneralStateTestCaseEipSpec> eipSpecs = forkEntry.getValue();
         if (eipSpecs == null) {
           continue;
@@ -261,7 +268,8 @@ public class StateTestExecutor {
             // This is a potential crash - rethrow for fuzzer to catch
             executionErrors.incrementAndGet();
             LOG.error("Execution exception: {}", e.getMessage(), e);
-            return ExecutionResult.crash("Exception: " + e.getClass().getName() + ": " + e.getMessage());
+            return ExecutionResult.crash(
+                "Exception: " + e.getClass().getName() + ": " + e.getMessage());
           }
         }
       }
@@ -271,9 +279,7 @@ public class StateTestExecutor {
     return ExecutionResult.success("completed", 0);
   }
 
-  /**
-   * Executes a single EIP spec.
-   */
+  /** Executes a single EIP spec. */
   private ExecutionResult executeSpec(final GeneralStateTestCaseEipSpec spec) {
     if (spec == null) {
       return ExecutionResult.skipped("null spec");
@@ -323,15 +329,16 @@ public class StateTestExecutor {
     Wei blobGasPrice = protocolSpec.getFeeMarket().blobGasPricePerGas(excessBlobGas);
 
     // Process the transaction
-    TransactionProcessingResult result = processor.processTransaction(
-        worldStateUpdater,
-        blockHeader,
-        transaction,
-        blockHeader.getCoinbase(),
-        OperationTracer.NO_TRACING,
-        (__, blockNumber) -> Hash.hash(Bytes.wrap(Long.toString(blockNumber).getBytes(UTF_8))),
-        TransactionValidationParams.processingBlock(),
-        blobGasPrice);
+    TransactionProcessingResult result =
+        processor.processTransaction(
+            worldStateUpdater,
+            blockHeader,
+            transaction,
+            blockHeader.getCoinbase(),
+            OperationTracer.NO_TRACING,
+            (__, blockNumber) -> Hash.hash(Bytes.wrap(Long.toString(blockNumber).getBytes(UTF_8))),
+            TransactionValidationParams.processingBlock(),
+            blobGasPrice);
 
     // Only commit state if transaction was valid
     if (!result.isInvalid()) {
@@ -367,13 +374,10 @@ public class StateTestExecutor {
         successfulExecutions.get(),
         parseErrors.get(),
         executionErrors.get(),
-        skippedTests.get()
-    );
+        skippedTests.get());
   }
 
-  /**
-   * Resets statistics.
-   */
+  /** Resets statistics. */
   public void resetStats() {
     totalExecutions.set(0);
     successfulExecutions.set(0);
@@ -387,33 +391,43 @@ public class StateTestExecutor {
    *
    * @return the total executions
    */
-  public long getTotalExecutions() { return totalExecutions.get(); }
+  public long getTotalExecutions() {
+    return totalExecutions.get();
+  }
 
   /**
    * Returns the successful executions.
    *
    * @return the successful executions
    */
-  public long getSuccessfulExecutions() { return successfulExecutions.get(); }
+  public long getSuccessfulExecutions() {
+    return successfulExecutions.get();
+  }
 
   /**
    * Returns the parse errors.
    *
    * @return the parse errors
    */
-  public long getParseErrors() { return parseErrors.get(); }
+  public long getParseErrors() {
+    return parseErrors.get();
+  }
 
   /**
    * Returns the execution errors.
    *
    * @return the execution errors
    */
-  public long getExecutionErrors() { return executionErrors.get(); }
+  public long getExecutionErrors() {
+    return executionErrors.get();
+  }
 
   /**
    * Returns the skipped tests.
    *
    * @return the skipped tests
    */
-  public long getSkippedTests() { return skippedTests.get(); }
+  public long getSkippedTests() {
+    return skippedTests.get();
+  }
 }

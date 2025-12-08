@@ -14,19 +14,18 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+
 /**
- * BitFlip mutation strategy.
- * Performs AFL-style systematic bit flipping mutations on bytecode.
- * AFL uses FLIP1/FLIP2/FLIP4/FLIP8 stages that flip consecutive bits at each position.
- * Ported from goevmlab mutations/bitflip.go
+ * BitFlip mutation strategy. Performs AFL-style systematic bit flipping mutations on bytecode. AFL
+ * uses FLIP1/FLIP2/FLIP4/FLIP8 stages that flip consecutive bits at each position. Ported from
+ * goevmlab mutations/bitflip.go
  */
 public class BitFlipMutationStrategy implements MutationStrategy {
 

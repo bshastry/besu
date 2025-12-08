@@ -19,8 +19,8 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * Combined mutation strategy that selects from multiple strategies based on weights.
- * Ported from goevmlab mutations/strategy.go
+ * Combined mutation strategy that selects from multiple strategies based on weights. Ported from
+ * goevmlab mutations/strategy.go
  */
 public class CombinedMutationStrategy implements MutationStrategy {
 
@@ -31,14 +31,14 @@ public class CombinedMutationStrategy implements MutationStrategy {
   private String lastSelectedStrategy;
 
   /**
-   * Creates a combined strategy with default strategies.
-   * This mirrors the Go implementation's NewStrategyFactory().
+   * Creates a combined strategy with default strategies. This mirrors the Go implementation's
+   * NewStrategyFactory().
    *
-   * <p>Note: "env" strategy is disabled - mutating block environment (timestamp, number,
-   * gasLimit, baseFee) causes false positives as it creates unrealistic test scenarios.
+   * <p>Note: "env" strategy is disabled - mutating block environment (timestamp, number, gasLimit,
+   * baseFee) causes false positives as it creates unrealistic test scenarios.
    *
-   * <p>Note: "splicing" is NOT registered by default - requires corpus access.
-   * Use SplicingMutationStrategy directly when corpus is available.
+   * <p>Note: "splicing" is NOT registered by default - requires corpus access. Use
+   * SplicingMutationStrategy directly when corpus is available.
    */
   public static CombinedMutationStrategy createDefault() {
     List<MutationStrategy> strategies = new ArrayList<>();
@@ -71,8 +71,8 @@ public class CombinedMutationStrategy implements MutationStrategy {
   }
 
   /**
-   * Creates a combined strategy with all strategies including splicing.
-   * This mirrors the Go implementation's NewStrategyFactory() + splicing registration.
+   * Creates a combined strategy with all strategies including splicing. This mirrors the Go
+   * implementation's NewStrategyFactory() + splicing registration.
    *
    * @param corpusProvider the corpus provider for splicing mutations
    * @return a new CombinedMutationStrategy with splicing enabled
@@ -187,26 +187,24 @@ public class CombinedMutationStrategy implements MutationStrategy {
       try {
         MutationResult result = strategy.mutate(data);
         lastSelectedStrategy = strategy.name();
-        return new MutationResult(result.getData(), strategy.name() + ":" + result.getDescription());
+        return new MutationResult(
+            result.getData(), strategy.name() + ":" + result.getDescription());
       } catch (MutationException e) {
         errors.add(e);
       }
     }
 
     // All strategies failed
-    throw new MutationException("All strategies failed. First error: " + errors.get(0).getMessage());
+    throw new MutationException(
+        "All strategies failed. First error: " + errors.get(0).getMessage());
   }
 
-  /**
-   * Returns the name of the last selected strategy.
-   */
+  /** Returns the name of the last selected strategy. */
   public String getLastSelectedStrategy() {
     return lastSelectedStrategy;
   }
 
-  /**
-   * Returns the list of strategies.
-   */
+  /** Returns the list of strategies. */
   public List<MutationStrategy> getStrategies() {
     return new ArrayList<>(strategies);
   }

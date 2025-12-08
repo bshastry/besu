@@ -14,10 +14,7 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-/**
- * Interface for state test mutation strategies.
- * Ported from goevmlab's mutation framework.
- */
+/** Interface for state test mutation strategies. Ported from goevmlab's mutation framework. */
 public interface MutationStrategy {
 
   /**
@@ -44,16 +41,14 @@ public interface MutationStrategy {
   MutationResult mutate(final byte[] data) throws MutationException;
 
   /**
-   * Returns the weight for this strategy in combined selection.
-   * Higher weights mean more frequent selection.
+   * Returns the weight for this strategy in combined selection. Higher weights mean more frequent
+   * selection.
    *
    * @return the strategy weight
    */
   int weight();
 
-  /**
-   * Exception thrown when mutation cannot be performed.
-   */
+  /** Exception thrown when mutation cannot be performed. */
   class MutationException extends Exception {
     /**
      * Creates a new MutationException with a message.
@@ -75,9 +70,7 @@ public interface MutationStrategy {
     }
   }
 
-  /**
-   * Result of a mutation operation.
-   */
+  /** Result of a mutation operation. */
   class MutationResult {
     private final byte[] data;
     private final String description;

@@ -15,6 +15,7 @@
 package org.hyperledger.besu.testfuzz;
 
 import org.hyperledger.besu.testfuzz.javafuzz.Fuzzer;
+import org.hyperledger.besu.testfuzz.parallel.CoverageGuidedFuzzer;
 import org.hyperledger.besu.testfuzz.statetest.CombinedMutationStrategy;
 import org.hyperledger.besu.testfuzz.statetest.MutationStrategy;
 import org.hyperledger.besu.testfuzz.statetest.StateTestCorpusProvider;
@@ -24,7 +25,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,14 +39,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.tuweni.bytes.Bytes;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 /**
- * CLI subcommand for state test fuzzing.
- * Fuzzes Besu's EVM implementation using state tests with goevmlab-style mutations.
+ * CLI subcommand for state test fuzzing. Fuzzes Besu's EVM implementation using state tests with
+ * goevmlab-style mutations.
  */
 @Command(
     name = "state-test-fuzz",
@@ -99,15 +98,19 @@ public class StateTestFuzzSubCommand implements Runnable {
       defaultValue = "0")
   private int workers;
 
+  @Option(
+      names = {"--parallel-guided"},
+      description =
+          "Use parallel coverage-guided fuzzing (combines multi-threading with JaCoCo guidance)")
+  private boolean parallelGuided = false;
+
   // Shared state for multi-threaded fuzzing
   private final AtomicLong totalIterations = new AtomicLong(0);
   private final AtomicLong totalCrashes = new AtomicLong(0);
   private final AtomicBoolean stopFlag = new AtomicBoolean(false);
   private List<byte[]> corpus;
 
-  /**
-   * Default constructor for PicoCLI.
-   */
+  /** Default constructor for PicoCLI. */
   public StateTestFuzzSubCommand() {
     // Required by PicoCLI
   }
@@ -143,11 +146,14 @@ public class StateTestFuzzSubCommand implements Runnable {
 
     // Start fuzzing
     try {
-      if (guidanceRegexp != null && !guidanceRegexp.isEmpty()) {
-        // Use JaCoCo-guided fuzzing
+      if (parallelGuided && guidanceRegexp != null && !guidanceRegexp.isEmpty()) {
+        // Use new parallel coverage-guided fuzzing
+        runParallelGuidedFuzzing(fuzzDuration);
+      } else if (guidanceRegexp != null && !guidanceRegexp.isEmpty()) {
+        // Use single-threaded JaCoCo-guided fuzzing
         runGuidedFuzzing(target, fuzzDuration);
       } else {
-        // Use simple fuzzing without coverage guidance
+        // Use simple multi-threaded fuzzing without coverage guidance
         runSimpleFuzzing(target, fuzzDuration);
       }
     } catch (Exception e) {
@@ -157,36 +163,56 @@ public class StateTestFuzzSubCommand implements Runnable {
     }
   }
 
+  private void runParallelGuidedFuzzing(final Duration fuzzDuration) throws Exception {
+    System.out.println("Starting parallel coverage-guided fuzzing...");
+    System.out.printf("Guidance regexp: %s%n", guidanceRegexp);
+    int numWorkers = workers > 0 ? workers : Runtime.getRuntime().availableProcessors();
+    System.out.printf("Workers: %d%n", numWorkers);
+    System.out.println();
+
+    CoverageGuidedFuzzer fuzzer =
+        new CoverageGuidedFuzzer.Builder()
+            .numWorkers(numWorkers)
+            .fork(fork)
+            .guidanceRegexp(guidanceRegexp)
+            .corpusDir(new File(corpusDir))
+            .newCorpusDir(newCorpusDir)
+            .crashDir(crashDir)
+            .timeout(fuzzDuration)
+            .build();
+
+    fuzzer.run();
+  }
+
   private void runGuidedFuzzing(final StateTestFuzzTarget target, final Duration fuzzDuration)
-      throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException,
-      IllegalAccessException, NoSuchAlgorithmException {
+      throws ClassNotFoundException,
+          NoSuchMethodException,
+          InvocationTargetException,
+          IllegalAccessException,
+          NoSuchAlgorithmException {
 
     System.out.println("Starting JaCoCo-guided fuzzing...");
     System.out.printf("Guidance regexp: %s%n", guidanceRegexp);
     System.out.println();
 
-    Fuzzer fuzzer = new Fuzzer(
-        target,
-        corpusDir,
-        target::getStats,
-        guidanceRegexp,
-        newCorpusDir
-    );
+    Fuzzer fuzzer = new Fuzzer(target, corpusDir, target::getStats, guidanceRegexp, newCorpusDir);
 
     // Set up duration limit if not infinite
     if (fuzzDuration != null) {
       Instant deadline = Instant.now().plus(fuzzDuration);
-      Thread shutdownThread = new Thread(() -> {
-        while (Instant.now().isBefore(deadline)) {
-          try {
-            Thread.sleep(1000);
-          } catch (InterruptedException e) {
-            break;
-          }
-        }
-        System.out.println("\nDuration limit reached. Stopping...");
-        System.exit(0);
-      });
+      Thread shutdownThread =
+          new Thread(
+              () -> {
+                while (Instant.now().isBefore(deadline)) {
+                  try {
+                    Thread.sleep(1000);
+                  } catch (InterruptedException e) {
+                    break;
+                  }
+                }
+                System.out.println("\nDuration limit reached. Stopping...");
+                System.exit(0);
+              });
       shutdownThread.setDaemon(true);
       shutdownThread.start();
     }
@@ -218,35 +244,39 @@ public class StateTestFuzzSubCommand implements Runnable {
     // Start worker threads
     for (int i = 0; i < numWorkers; i++) {
       final int workerId = i;
-      executor.submit(() -> {
-        try {
-          runWorker(workerId, deadline);
-        } finally {
-          latch.countDown();
-        }
-      });
+      executor.submit(
+          () -> {
+            try {
+              runWorker(workerId, deadline);
+            } finally {
+              latch.countDown();
+            }
+          });
     }
 
     // Progress reporter thread
-    Thread reporter = new Thread(() -> {
-      // Tracking progress
-      while (!stopFlag.get()) {
-        try {
-          Thread.sleep(3000);
-        } catch (InterruptedException e) {
-          break;
-        }
+    Thread reporter =
+        new Thread(
+            () -> {
+              // Tracking progress
+              while (!stopFlag.get()) {
+                try {
+                  Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                  break;
+                }
 
-        Instant now = Instant.now();
-        Duration elapsed = Duration.between(startTime, now);
-        long iters = totalIterations.get();
-        long crashes = totalCrashes.get();
-        double rate = iters / (elapsed.getSeconds() + 0.001);
+                Instant now = Instant.now();
+                Duration elapsed = Duration.between(startTime, now);
+                long iters = totalIterations.get();
+                long crashes = totalCrashes.get();
+                double rate = iters / (elapsed.getSeconds() + 0.001);
 
-        System.out.printf("elapsed: %s | execs: %d (%.1f/sec) | crashes: %d | workers: %d%n",
-            formatDuration(elapsed), iters, rate, crashes, numWorkers);
-      }
-    });
+                System.out.printf(
+                    "elapsed: %s | execs: %d (%.1f/sec) | crashes: %d | workers: %d%n",
+                    formatDuration(elapsed), iters, rate, crashes, numWorkers);
+              }
+            });
     reporter.setDaemon(true);
     reporter.start();
 
@@ -279,8 +309,8 @@ public class StateTestFuzzSubCommand implements Runnable {
   }
 
   /**
-   * Worker thread that performs fuzzing.
-   * Each worker has its own executor and mutator for thread safety.
+   * Worker thread that performs fuzzing. Each worker has its own executor and mutator for thread
+   * safety.
    */
   private void runWorker(final int workerId, final Instant deadline) {
     // Each worker gets its own executor and mutator (thread-local)
@@ -327,9 +357,7 @@ public class StateTestFuzzSubCommand implements Runnable {
     }
   }
 
-  /**
-   * Loads corpus files from directory.
-   */
+  /** Loads corpus files from directory. */
   private List<byte[]> loadCorpusFiles(final String dir) {
     List<byte[]> files = new ArrayList<>();
     loadCorpusRecursive(new File(dir), files);
@@ -375,9 +403,7 @@ public class StateTestFuzzSubCommand implements Runnable {
     }
   }
 
-  /**
-   * Saves crash with the actual mutated JSON bytes.
-   */
+  /** Saves crash with the actual mutated JSON bytes. */
   private synchronized void saveCrashBytes(final byte[] testData, final String error) {
     try {
       String hash = String.format("%08x", java.util.Arrays.hashCode(testData));
@@ -392,10 +418,9 @@ public class StateTestFuzzSubCommand implements Runnable {
       String metaFilename = filename.replace(".json", ".txt");
       File metaFile = new File(crashDir, metaFilename);
       try (FileOutputStream fos = new FileOutputStream(metaFile)) {
-        String meta = String.format("Crash at %s%nError: %s%n",
-            Instant.now(),
-            error != null ? error : "unknown"
-        );
+        String meta =
+            String.format(
+                "Crash at %s%nError: %s%n", Instant.now(), error != null ? error : "unknown");
         fos.write(meta.getBytes(java.nio.charset.StandardCharsets.UTF_8));
       }
 
@@ -415,11 +440,14 @@ public class StateTestFuzzSubCommand implements Runnable {
 
     try {
       if (normalizedDuration.endsWith("h")) {
-        return Duration.ofHours(Long.parseLong(normalizedDuration.substring(0, normalizedDuration.length() - 1)));
+        return Duration.ofHours(
+            Long.parseLong(normalizedDuration.substring(0, normalizedDuration.length() - 1)));
       } else if (normalizedDuration.endsWith("m")) {
-        return Duration.ofMinutes(Long.parseLong(normalizedDuration.substring(0, normalizedDuration.length() - 1)));
+        return Duration.ofMinutes(
+            Long.parseLong(normalizedDuration.substring(0, normalizedDuration.length() - 1)));
       } else if (normalizedDuration.endsWith("s")) {
-        return Duration.ofSeconds(Long.parseLong(normalizedDuration.substring(0, normalizedDuration.length() - 1)));
+        return Duration.ofSeconds(
+            Long.parseLong(normalizedDuration.substring(0, normalizedDuration.length() - 1)));
       } else {
         // Assume seconds
         return Duration.ofSeconds(Long.parseLong(normalizedDuration));

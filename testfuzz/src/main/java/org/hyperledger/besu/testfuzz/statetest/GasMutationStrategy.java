@@ -14,17 +14,16 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
+import java.util.Map;
+import java.util.Random;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 
-import java.util.Map;
-import java.util.Random;
-
 /**
- * Gas limit mutation strategy.
- * Mutates transaction gas limits to test gas metering edge cases.
+ * Gas limit mutation strategy. Mutates transaction gas limits to test gas metering edge cases.
  * Ported from goevmlab.
  */
 public class GasMutationStrategy implements MutationStrategy {
@@ -33,24 +32,24 @@ public class GasMutationStrategy implements MutationStrategy {
 
   // Interesting gas values for fuzzing
   private static final long[] INTERESTING_GAS_VALUES = {
-      0L,
-      1L,
-      21000L,         // Base tx cost
-      21001L,         // Just above base
-      20999L,         // Just below base
-      53000L,         // CREATE cost region
-      32000L,         // CALL stipend region
-      2300L,          // Call stipend
-      2600L,          // COLD_ACCOUNT_ACCESS (EIP-2929)
-      100L,           // WARM_STORAGE_READ
-      20000L,         // SSTORE_SET
-      5000L,          // SSTORE_RESET
-      100000L,        // Common test value
-      1000000L,       // Higher gas
-      10000000L,      // 10M gas
-      30000000L,      // Block gas limit region
-      0xFFFFFFFFL,    // Max uint32
-      0xFFFFFFFFFFFFL // Large value
+    0L,
+    1L,
+    21000L, // Base tx cost
+    21001L, // Just above base
+    20999L, // Just below base
+    53000L, // CREATE cost region
+    32000L, // CALL stipend region
+    2300L, // Call stipend
+    2600L, // COLD_ACCOUNT_ACCESS (EIP-2929)
+    100L, // WARM_STORAGE_READ
+    20000L, // SSTORE_SET
+    5000L, // SSTORE_RESET
+    100000L, // Common test value
+    1000000L, // Higher gas
+    10000000L, // 10M gas
+    30000000L, // Block gas limit region
+    0xFFFFFFFFL, // Max uint32
+    0xFFFFFFFFFFFFL // Large value
   };
 
   public GasMutationStrategy() {

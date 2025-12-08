@@ -14,18 +14,17 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+
 /**
- * Bytecode mutation strategy.
- * Performs basic bytecode mutation while preserving PUSH operands.
+ * Bytecode mutation strategy. Performs basic bytecode mutation while preserving PUSH operands.
  * Ported from goevmlab.
  */
 public class BytecodeMutationStrategy implements MutationStrategy {

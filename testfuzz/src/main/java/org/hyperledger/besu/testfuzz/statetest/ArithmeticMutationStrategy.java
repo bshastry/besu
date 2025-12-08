@@ -14,23 +14,21 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 
-import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-
 /**
- * Arithmetic mutation strategy.
- * Applies AFL-style small arithmetic mutations (+-1-35) to numeric fields.
- * This is effective for finding off-by-one bugs and boundary condition issues.
- * Ported from goevmlab mutations/arithmetic.go
+ * Arithmetic mutation strategy. Applies AFL-style small arithmetic mutations (+-1-35) to numeric
+ * fields. This is effective for finding off-by-one bugs and boundary condition issues. Ported from
+ * goevmlab mutations/arithmetic.go
  */
 public class ArithmeticMutationStrategy implements MutationStrategy {
 
@@ -72,9 +70,7 @@ public class ArithmeticMutationStrategy implements MutationStrategy {
     return 12; // High weight - effective for edge cases
   }
 
-  /**
-   * Describes a target field for arithmetic mutation.
-   */
+  /** Describes a target field for arithmetic mutation. */
   private static class ArithmeticTarget {
     final String section;
     final String field;
@@ -99,18 +95,18 @@ public class ArithmeticMutationStrategy implements MutationStrategy {
   // Note: env fields and tx nonce are disabled - they cause false positives because
   // mutating block environment or nonce creates unrealistic test scenarios.
   private static final ArithmeticTarget[] ARITHMETIC_TARGETS = {
-      // Transaction fields
-      new ArithmeticTarget("transaction", "gasLimit", true, false, true),
-      new ArithmeticTarget("transaction", "value", true, true, true),
-      new ArithmeticTarget("transaction", "nonce", false, false, false), // disabled: unrealistic
-      new ArithmeticTarget("transaction", "gasPrice", false, true, true),
-      new ArithmeticTarget("transaction", "maxFeePerGas", false, true, true),
-      new ArithmeticTarget("transaction", "maxPriorityFeePerGas", false, true, true),
-      // Environment fields - disabled: mutating block env causes false positives
-      new ArithmeticTarget("env", "currentGasLimit", false, false, false),
-      new ArithmeticTarget("env", "currentNumber", false, false, false),
-      new ArithmeticTarget("env", "currentTimestamp", false, false, false),
-      new ArithmeticTarget("env", "currentBaseFee", false, true, false),
+    // Transaction fields
+    new ArithmeticTarget("transaction", "gasLimit", true, false, true),
+    new ArithmeticTarget("transaction", "value", true, true, true),
+    new ArithmeticTarget("transaction", "nonce", false, false, false), // disabled: unrealistic
+    new ArithmeticTarget("transaction", "gasPrice", false, true, true),
+    new ArithmeticTarget("transaction", "maxFeePerGas", false, true, true),
+    new ArithmeticTarget("transaction", "maxPriorityFeePerGas", false, true, true),
+    // Environment fields - disabled: mutating block env causes false positives
+    new ArithmeticTarget("env", "currentGasLimit", false, false, false),
+    new ArithmeticTarget("env", "currentNumber", false, false, false),
+    new ArithmeticTarget("env", "currentTimestamp", false, false, false),
+    new ArithmeticTarget("env", "currentBaseFee", false, true, false),
   };
 
   @Override

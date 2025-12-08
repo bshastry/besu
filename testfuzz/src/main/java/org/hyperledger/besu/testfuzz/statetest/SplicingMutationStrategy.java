@@ -14,21 +14,19 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+
 /**
- * Splicing mutation strategy.
- * Combines bytecode from different corpus inputs (AFL splicing stage).
- * AFL's splicing finds a point where two inputs differ and creates a hybrid by
- * combining the prefix of one with the suffix of another.
- * Ported from goevmlab mutations/splicing.go
+ * Splicing mutation strategy. Combines bytecode from different corpus inputs (AFL splicing stage).
+ * AFL's splicing finds a point where two inputs differ and creates a hybrid by combining the prefix
+ * of one with the suffix of another. Ported from goevmlab mutations/splicing.go
  */
 public class SplicingMutationStrategy implements MutationStrategy {
 
@@ -36,9 +34,8 @@ public class SplicingMutationStrategy implements MutationStrategy {
   private final Random rng;
 
   /**
-   * Interface for providing corpus access for splicing operations.
-   * This allows the splicing strategy to access other corpus entries
-   * without depending on the full corpus implementation.
+   * Interface for providing corpus access for splicing operations. This allows the splicing
+   * strategy to access other corpus entries without depending on the full corpus implementation.
    */
   public interface CorpusProvider {
     /**
@@ -147,9 +144,8 @@ public class SplicingMutationStrategy implements MutationStrategy {
   }
 
   /**
-   * Combines two bytecode sequences at a differing point.
-   * This implements AFL's splice algorithm: find first and last differing positions,
-   * pick a random point between them, and create a hybrid.
+   * Combines two bytecode sequences at a differing point. This implements AFL's splice algorithm:
+   * find first and last differing positions, pick a random point between them, and create a hybrid.
    *
    * @param a the first bytecode
    * @param b the second bytecode
@@ -199,8 +195,8 @@ public class SplicingMutationStrategy implements MutationStrategy {
    * @param newCode the new bytecode
    * @return the mutation result
    */
-  private MutationResult replaceBytecode(final byte[] data, final String address, final byte[] newCode)
-      throws MutationException {
+  private MutationResult replaceBytecode(
+      final byte[] data, final String address, final byte[] newCode) throws MutationException {
     JsonNode root = JsonMutationHelper.parse(data);
     Map.Entry<String, JsonNode> testEntry = JsonMutationHelper.getFirstTest(root);
     JsonNode test = testEntry.getValue();

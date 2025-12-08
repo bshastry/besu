@@ -14,21 +14,19 @@
  */
 package org.hyperledger.besu.testfuzz.statetest;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+
 /**
- * Dictionary mutation strategy.
- * Injects EVM-specific tokens into bytecode.
- * This is inspired by AFL's dictionary mode which maintains a list of
- * domain-specific tokens that are likely to trigger interesting behavior.
- * Ported from goevmlab mutations/dictionary.go
+ * Dictionary mutation strategy. Injects EVM-specific tokens into bytecode. This is inspired by
+ * AFL's dictionary mode which maintains a list of domain-specific tokens that are likely to trigger
+ * interesting behavior. Ported from goevmlab mutations/dictionary.go
  */
 public class DictionaryMutationStrategy implements MutationStrategy {
 
@@ -37,87 +35,87 @@ public class DictionaryMutationStrategy implements MutationStrategy {
 
   // EVM dictionary - byte sequences likely to trigger interesting behavior
   private static final byte[][] EVM_DICTIONARY = {
-      // Critical state-changing opcodes
-      {(byte) 0x00},                   // STOP
-      {(byte) 0xF1},                   // CALL
-      {(byte) 0xF2},                   // CALLCODE
-      {(byte) 0xF3},                   // RETURN
-      {(byte) 0xF4},                   // DELEGATECALL
-      {(byte) 0xF5},                   // CREATE2
-      {(byte) 0xFA},                   // STATICCALL
-      {(byte) 0xFD},                   // REVERT
-      {(byte) 0xFE},                   // INVALID
-      {(byte) 0xFF},                   // SELFDESTRUCT
-      {(byte) 0xF0},                   // CREATE
+    // Critical state-changing opcodes
+    {(byte) 0x00}, // STOP
+    {(byte) 0xF1}, // CALL
+    {(byte) 0xF2}, // CALLCODE
+    {(byte) 0xF3}, // RETURN
+    {(byte) 0xF4}, // DELEGATECALL
+    {(byte) 0xF5}, // CREATE2
+    {(byte) 0xFA}, // STATICCALL
+    {(byte) 0xFD}, // REVERT
+    {(byte) 0xFE}, // INVALID
+    {(byte) 0xFF}, // SELFDESTRUCT
+    {(byte) 0xF0}, // CREATE
 
-      // Storage operations
-      {(byte) 0x54},                   // SLOAD
-      {(byte) 0x55},                   // SSTORE
-      {(byte) 0x5C},                   // TLOAD (EIP-1153)
-      {(byte) 0x5D},                   // TSTORE (EIP-1153)
+    // Storage operations
+    {(byte) 0x54}, // SLOAD
+    {(byte) 0x55}, // SSTORE
+    {(byte) 0x5C}, // TLOAD (EIP-1153)
+    {(byte) 0x5D}, // TSTORE (EIP-1153)
 
-      // Memory operations
-      {(byte) 0x51},                   // MLOAD
-      {(byte) 0x52},                   // MSTORE
-      {(byte) 0x5E},                   // MCOPY (EIP-5656)
+    // Memory operations
+    {(byte) 0x51}, // MLOAD
+    {(byte) 0x52}, // MSTORE
+    {(byte) 0x5E}, // MCOPY (EIP-5656)
 
-      // Common PUSH sequences
-      {(byte) 0x60, (byte) 0x00},      // PUSH1 0
-      {(byte) 0x60, (byte) 0x01},      // PUSH1 1
-      {(byte) 0x60, (byte) 0xFF},      // PUSH1 255
-      {(byte) 0x60, (byte) 0x20},      // PUSH1 32 (32 bytes)
-      {(byte) 0x61, (byte) 0xFF, (byte) 0xFF}, // PUSH2 0xFFFF
-      {(byte) 0x63, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF}, // PUSH4 0xFFFFFFFF
+    // Common PUSH sequences
+    {(byte) 0x60, (byte) 0x00}, // PUSH1 0
+    {(byte) 0x60, (byte) 0x01}, // PUSH1 1
+    {(byte) 0x60, (byte) 0xFF}, // PUSH1 255
+    {(byte) 0x60, (byte) 0x20}, // PUSH1 32 (32 bytes)
+    {(byte) 0x61, (byte) 0xFF, (byte) 0xFF}, // PUSH2 0xFFFF
+    {(byte) 0x63, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF}, // PUSH4 0xFFFFFFFF
 
-      // Jump operations
-      {(byte) 0x56},                   // JUMP
-      {(byte) 0x57},                   // JUMPI
-      {(byte) 0x5B},                   // JUMPDEST
+    // Jump operations
+    {(byte) 0x56}, // JUMP
+    {(byte) 0x57}, // JUMPI
+    {(byte) 0x5B}, // JUMPDEST
 
-      // Control flow patterns
-      {(byte) 0x60, (byte) 0x00, (byte) 0x60, (byte) 0x00, (byte) 0xF3}, // PUSH1 0 PUSH1 0 RETURN
-      {(byte) 0x60, (byte) 0x00, (byte) 0x60, (byte) 0x00, (byte) 0xFD}, // PUSH1 0 PUSH1 0 REVERT
+    // Control flow patterns
+    {(byte) 0x60, (byte) 0x00, (byte) 0x60, (byte) 0x00, (byte) 0xF3}, // PUSH1 0 PUSH1 0 RETURN
+    {(byte) 0x60, (byte) 0x00, (byte) 0x60, (byte) 0x00, (byte) 0xFD}, // PUSH1 0 PUSH1 0 REVERT
 
-      // Block info opcodes
-      {(byte) 0x49},                   // BLOBHASH (EIP-4844)
-      {(byte) 0x4A},                   // BLOBBASEFEE (EIP-7516)
-      {(byte) 0x40},                   // BLOCKHASH
-      {(byte) 0x41},                   // COINBASE
-      {(byte) 0x42},                   // TIMESTAMP
-      {(byte) 0x43},                   // NUMBER
-      {(byte) 0x44},                   // PREVRANDAO
-      {(byte) 0x45},                   // GASLIMIT
-      {(byte) 0x46},                   // CHAINID
-      {(byte) 0x48},                   // BASEFEE
+    // Block info opcodes
+    {(byte) 0x49}, // BLOBHASH (EIP-4844)
+    {(byte) 0x4A}, // BLOBBASEFEE (EIP-7516)
+    {(byte) 0x40}, // BLOCKHASH
+    {(byte) 0x41}, // COINBASE
+    {(byte) 0x42}, // TIMESTAMP
+    {(byte) 0x43}, // NUMBER
+    {(byte) 0x44}, // PREVRANDAO
+    {(byte) 0x45}, // GASLIMIT
+    {(byte) 0x46}, // CHAINID
+    {(byte) 0x48}, // BASEFEE
 
-      // Precompile call patterns (PUSH1 address)
-      {(byte) 0x60, (byte) 0x01},      // PUSH1 1 (ecrecover)
-      {(byte) 0x60, (byte) 0x02},      // PUSH1 2 (SHA256)
-      {(byte) 0x60, (byte) 0x03},      // PUSH1 3 (RIPEMD160)
-      {(byte) 0x60, (byte) 0x04},      // PUSH1 4 (IDENTITY)
-      {(byte) 0x60, (byte) 0x05},      // PUSH1 5 (MODEXP)
-      {(byte) 0x60, (byte) 0x06},      // PUSH1 6 (BN254_ADD)
-      {(byte) 0x60, (byte) 0x07},      // PUSH1 7 (BN254_MUL)
-      {(byte) 0x60, (byte) 0x08},      // PUSH1 8 (BN254_PAIRING)
-      {(byte) 0x60, (byte) 0x09},      // PUSH1 9 (BLAKE2F)
-      {(byte) 0x60, (byte) 0x0A},      // PUSH1 10 (KZG_POINT_EVAL)
+    // Precompile call patterns (PUSH1 address)
+    {(byte) 0x60, (byte) 0x01}, // PUSH1 1 (ecrecover)
+    {(byte) 0x60, (byte) 0x02}, // PUSH1 2 (SHA256)
+    {(byte) 0x60, (byte) 0x03}, // PUSH1 3 (RIPEMD160)
+    {(byte) 0x60, (byte) 0x04}, // PUSH1 4 (IDENTITY)
+    {(byte) 0x60, (byte) 0x05}, // PUSH1 5 (MODEXP)
+    {(byte) 0x60, (byte) 0x06}, // PUSH1 6 (BN254_ADD)
+    {(byte) 0x60, (byte) 0x07}, // PUSH1 7 (BN254_MUL)
+    {(byte) 0x60, (byte) 0x08}, // PUSH1 8 (BN254_PAIRING)
+    {(byte) 0x60, (byte) 0x09}, // PUSH1 9 (BLAKE2F)
+    {(byte) 0x60, (byte) 0x0A}, // PUSH1 10 (KZG_POINT_EVAL)
 
-      // Common function selectors (for calldata injection)
-      {(byte) 0xa9, (byte) 0x05, (byte) 0x9c, (byte) 0xbb}, // transfer(address,uint256)
-      {(byte) 0x09, (byte) 0x5e, (byte) 0xa7, (byte) 0xb3}, // approve(address,uint256)
-      {(byte) 0x70, (byte) 0xa0, (byte) 0x82, (byte) 0x31}, // balanceOf(address)
-      {(byte) 0x18, (byte) 0x16, (byte) 0x0d, (byte) 0xdd}, // totalSupply()
+    // Common function selectors (for calldata injection)
+    {(byte) 0xa9, (byte) 0x05, (byte) 0x9c, (byte) 0xbb}, // transfer(address,uint256)
+    {(byte) 0x09, (byte) 0x5e, (byte) 0xa7, (byte) 0xb3}, // approve(address,uint256)
+    {(byte) 0x70, (byte) 0xa0, (byte) 0x82, (byte) 0x31}, // balanceOf(address)
+    {(byte) 0x18, (byte) 0x16, (byte) 0x0d, (byte) 0xdd}, // totalSupply()
 
-      // Gas-related opcodes
-      {(byte) 0x5A},                   // GAS
-      {(byte) 0x3A},                   // GASPRICE
-      {(byte) 0x47},                   // SELFBALANCE
+    // Gas-related opcodes
+    {(byte) 0x5A}, // GAS
+    {(byte) 0x3A}, // GASPRICE
+    {(byte) 0x47}, // SELFBALANCE
 
-      // Code/data copy opcodes
-      {(byte) 0x39},                   // CODECOPY
-      {(byte) 0x37},                   // CALLDATACOPY
-      {(byte) 0x3C},                   // EXTCODECOPY
-      {(byte) 0x3E},                   // RETURNDATACOPY
+    // Code/data copy opcodes
+    {(byte) 0x39}, // CODECOPY
+    {(byte) 0x37}, // CALLDATACOPY
+    {(byte) 0x3C}, // EXTCODECOPY
+    {(byte) 0x3E}, // RETURNDATACOPY
   };
 
   // PUSH32 max uint256 - special case because it's 33 bytes
