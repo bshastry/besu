@@ -20,10 +20,37 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
 
-/** Tests for EnhancedCorpusEntry parsing and cross-VM metadata extraction. */
+/**
+ * Tests for EnhancedCorpusEntry parsing and cross-VM metadata extraction. Tests both EEST _info
+ * format and legacy _crossvm format.
+ */
 class EnhancedCorpusEntryTest {
 
-  private static final String SAMPLE_TEST_WITH_CROSSVM =
+  // EEST format: _info inside test object (preferred)
+  private static final String SAMPLE_TEST_WITH_EEST_INFO =
+      """
+      {
+        "testName": {
+          "_info": {
+            "comment": "Cross-VM consensus verification test",
+            "generatedBy": "geth",
+            "traceHash": "abc123def456789012345678901234567890",
+            "stateRoot": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "traceLines": 42,
+            "crossvmVersion": "1.0",
+            "version": "1.14.0-dev",
+            "fork": "Prague"
+          },
+          "env": { "currentCoinbase": "0x0000000000000000000000000000000000000000" },
+          "pre": {},
+          "transaction": { "data": ["0x"], "gasLimit": ["0x5208"], "value": ["0x0"] },
+          "expect": [{ "indexes": { "data": 0 }, "network": [">=Prague"], "result": {} }]
+        }
+      }
+      """;
+
+  // Legacy format: _crossvm at top level (for backwards compatibility)
+  private static final String SAMPLE_TEST_WITH_LEGACY_CROSSVM =
       """
       {
         "testName": {
@@ -53,13 +80,47 @@ class EnhancedCorpusEntryTest {
       }
       """;
 
+  // ===== EEST Format Tests =====
+
   @Test
-  void parse_withCrossVMMetadata_extractsMetadata() {
-    byte[] json = SAMPLE_TEST_WITH_CROSSVM.getBytes(StandardCharsets.UTF_8);
+  void parse_withEestInfoMetadata_extractsMetadata() {
+    byte[] json = SAMPLE_TEST_WITH_EEST_INFO.getBytes(StandardCharsets.UTF_8);
 
     EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
 
     assertThat(entry.hasMetadata()).isTrue();
+    assertThat(entry.usesEestFormat()).isTrue();
+    assertThat(entry.getTestName()).isEqualTo("testName");
+    assertThat(entry.getMetadata().getGeneratedBy()).isEqualTo("geth");
+    assertThat(entry.getMetadata().getVersion()).isEqualTo("1.14.0-dev");
+    assertThat(entry.getMetadata().getTraceHash())
+        .isEqualTo("abc123def456789012345678901234567890");
+    assertThat(entry.getMetadata().getStateRoot())
+        .isEqualTo("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+    assertThat(entry.getMetadata().getTraceLines()).isEqualTo(42);
+    assertThat(entry.getMetadata().getCrossvmVersion()).isEqualTo("1.0");
+    assertThat(entry.getMetadata().getFork()).isEqualTo("Prague");
+  }
+
+  @Test
+  void parse_withEestInfo_extractsForkFromMetadata() {
+    byte[] json = SAMPLE_TEST_WITH_EEST_INFO.getBytes(StandardCharsets.UTF_8);
+    EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
+
+    assertThat(entry.getFork()).isEqualTo("Prague");
+  }
+
+  // ===== Legacy Format Tests =====
+
+  @Test
+  void parse_withLegacyCrossVMMetadata_extractsMetadata() {
+    byte[] json = SAMPLE_TEST_WITH_LEGACY_CROSSVM.getBytes(StandardCharsets.UTF_8);
+
+    EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
+
+    assertThat(entry.hasMetadata()).isTrue();
+    assertThat(entry.usesEestFormat()).isFalse();
+    assertThat(entry.getTestName()).isNull(); // Legacy format doesn't track test name
     assertThat(entry.getMetadata().getGeneratedBy()).isEqualTo("geth");
     assertThat(entry.getMetadata().getVersion()).isEqualTo("1.14.0-dev");
     assertThat(entry.getMetadata().getTraceHash())
@@ -69,6 +130,8 @@ class EnhancedCorpusEntryTest {
     assertThat(entry.getMetadata().getTraceLines()).isEqualTo(42);
   }
 
+  // ===== Common Tests =====
+
   @Test
   void parse_withoutCrossVMMetadata_noMetadata() {
     byte[] json = SAMPLE_TEST_WITHOUT_CROSSVM.getBytes(StandardCharsets.UTF_8);
@@ -77,6 +140,7 @@ class EnhancedCorpusEntryTest {
 
     assertThat(entry.hasMetadata()).isFalse();
     assertThat(entry.getMetadata()).isNull();
+    assertThat(entry.usesEestFormat()).isFalse();
   }
 
   @Test
@@ -85,6 +149,7 @@ class EnhancedCorpusEntryTest {
 
     assertThat(entry.hasMetadata()).isFalse();
     assertThat(entry.getTestRaw()).isNull();
+    assertThat(entry.usesEestFormat()).isFalse();
   }
 
   @Test
@@ -92,6 +157,7 @@ class EnhancedCorpusEntryTest {
     EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(new byte[0]);
 
     assertThat(entry.hasMetadata()).isFalse();
+    assertThat(entry.usesEestFormat()).isFalse();
   }
 
   @Test
@@ -102,11 +168,12 @@ class EnhancedCorpusEntryTest {
 
     assertThat(entry.hasMetadata()).isFalse();
     assertThat(entry.getTestRaw()).isEqualTo(invalidJson);
+    assertThat(entry.usesEestFormat()).isFalse();
   }
 
   @Test
-  void shouldVerifyAgainst_fromOtherClient_true() {
-    byte[] json = SAMPLE_TEST_WITH_CROSSVM.getBytes(StandardCharsets.UTF_8);
+  void shouldVerifyAgainst_eestFormat_fromOtherClient_true() {
+    byte[] json = SAMPLE_TEST_WITH_EEST_INFO.getBytes(StandardCharsets.UTF_8);
     EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
 
     // Besu should verify against geth-generated entries
@@ -119,6 +186,15 @@ class EnhancedCorpusEntryTest {
   }
 
   @Test
+  void shouldVerifyAgainst_legacyFormat_fromOtherClient_true() {
+    byte[] json = SAMPLE_TEST_WITH_LEGACY_CROSSVM.getBytes(StandardCharsets.UTF_8);
+    EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
+
+    assertThat(entry.shouldVerifyAgainst("besu")).isTrue();
+    assertThat(entry.shouldVerifyAgainst("geth")).isFalse();
+  }
+
+  @Test
   void shouldVerifyAgainst_noMetadata_false() {
     byte[] json = SAMPLE_TEST_WITHOUT_CROSSVM.getBytes(StandardCharsets.UTF_8);
     EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
@@ -127,8 +203,8 @@ class EnhancedCorpusEntryTest {
   }
 
   @Test
-  void getTestWithoutMetadata_removesCrossVMField() {
-    byte[] json = SAMPLE_TEST_WITH_CROSSVM.getBytes(StandardCharsets.UTF_8);
+  void getTestWithoutMetadata_legacyFormat_removesCrossVMField() {
+    byte[] json = SAMPLE_TEST_WITH_LEGACY_CROSSVM.getBytes(StandardCharsets.UTF_8);
     EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
 
     byte[] cleanTest = entry.getTestWithoutMetadata();
@@ -136,9 +212,20 @@ class EnhancedCorpusEntryTest {
 
     // Should not contain _crossvm
     assertThat(cleanJson).doesNotContain("_crossvm");
-    assertThat(cleanJson).doesNotContain("traceHash");
-    assertThat(cleanJson).doesNotContain("generatedBy");
     // Should still contain the test content
+    assertThat(cleanJson).contains("testName");
+    assertThat(cleanJson).contains("currentCoinbase");
+  }
+
+  @Test
+  void getTestWithoutMetadata_eestFormat_preservesInfoField() {
+    byte[] json = SAMPLE_TEST_WITH_EEST_INFO.getBytes(StandardCharsets.UTF_8);
+    EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
+
+    byte[] cleanTest = entry.getTestWithoutMetadata();
+    String cleanJson = new String(cleanTest, StandardCharsets.UTF_8);
+
+    // For EEST format, _info is preserved (Besu's parser ignores unknown fields)
     assertThat(cleanJson).contains("testName");
     assertThat(cleanJson).contains("currentCoinbase");
   }
@@ -155,8 +242,16 @@ class EnhancedCorpusEntryTest {
   }
 
   @Test
-  void getTraceHash_withMetadata_returnsHash() {
-    byte[] json = SAMPLE_TEST_WITH_CROSSVM.getBytes(StandardCharsets.UTF_8);
+  void getTraceHash_eestFormat_returnsHash() {
+    byte[] json = SAMPLE_TEST_WITH_EEST_INFO.getBytes(StandardCharsets.UTF_8);
+    EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
+
+    assertThat(entry.getTraceHash()).isEqualTo("abc123def456789012345678901234567890");
+  }
+
+  @Test
+  void getTraceHash_legacyFormat_returnsHash() {
+    byte[] json = SAMPLE_TEST_WITH_LEGACY_CROSSVM.getBytes(StandardCharsets.UTF_8);
     EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
 
     assertThat(entry.getTraceHash()).isEqualTo("abc123def456789012345678901234567890");
@@ -172,7 +267,7 @@ class EnhancedCorpusEntryTest {
 
   @Test
   void getGeneratedBy_withMetadata_returnsClient() {
-    byte[] json = SAMPLE_TEST_WITH_CROSSVM.getBytes(StandardCharsets.UTF_8);
+    byte[] json = SAMPLE_TEST_WITH_EEST_INFO.getBytes(StandardCharsets.UTF_8);
     EnhancedCorpusEntry entry = EnhancedCorpusEntry.parse(json);
 
     assertThat(entry.getGeneratedBy()).isEqualTo("geth");
@@ -186,9 +281,11 @@ class EnhancedCorpusEntryTest {
     assertThat(entry.getGeneratedBy()).isNull();
   }
 
+  // ===== CrossVMMetadata Tests =====
+
   @Test
   void crossVMMetadata_isFromOtherClient_variousCases() {
-    CrossVMMetadata metadata = new CrossVMMetadata("hash", "root", 10, "geth", "1.0");
+    CrossVMMetadata metadata = new CrossVMMetadata("geth", "hash", "root", 10, "1.0");
 
     assertThat(metadata.isFromOtherClient("besu")).isTrue();
     assertThat(metadata.isFromOtherClient("nethermind")).isTrue();
@@ -199,8 +296,54 @@ class EnhancedCorpusEntryTest {
 
   @Test
   void crossVMMetadata_hasTraceHash_variousCases() {
-    assertThat(new CrossVMMetadata("hash", "root", 10, "geth", "1.0").hasTraceHash()).isTrue();
-    assertThat(new CrossVMMetadata("", "root", 10, "geth", "1.0").hasTraceHash()).isFalse();
-    assertThat(new CrossVMMetadata(null, "root", 10, "geth", "1.0").hasTraceHash()).isFalse();
+    assertThat(new CrossVMMetadata("geth", "hash", "root", 10, "1.0").hasTraceHash()).isTrue();
+    assertThat(new CrossVMMetadata("geth", "", "root", 10, "1.0").hasTraceHash()).isFalse();
+    assertThat(new CrossVMMetadata("geth", null, "root", 10, "1.0").hasTraceHash()).isFalse();
+  }
+
+  @Test
+  void crossVMMetadata_hasRequiredFields_allPresent() {
+    CrossVMMetadata metadata =
+        new CrossVMMetadata(
+            "geth", "traceHash123", "0xstateRoot", CrossVMMetadata.CROSSVM_SPEC_VERSION);
+
+    assertThat(metadata.hasRequiredFields()).isTrue();
+  }
+
+  @Test
+  void crossVMMetadata_hasRequiredFields_missingGeneratedBy() {
+    CrossVMMetadata metadata =
+        new CrossVMMetadata(
+            null, "traceHash123", "0xstateRoot", CrossVMMetadata.CROSSVM_SPEC_VERSION);
+
+    assertThat(metadata.hasRequiredFields()).isFalse();
+  }
+
+  @Test
+  void crossVMMetadata_hasRequiredFields_missingTraceHash() {
+    CrossVMMetadata metadata =
+        new CrossVMMetadata("geth", null, "0xstateRoot", CrossVMMetadata.CROSSVM_SPEC_VERSION);
+
+    assertThat(metadata.hasRequiredFields()).isFalse();
+  }
+
+  @Test
+  void crossVMMetadata_builderPattern_setsOptionalFields() {
+    CrossVMMetadata metadata =
+        new CrossVMMetadata("besu", "hash", "root", CrossVMMetadata.CROSSVM_SPEC_VERSION)
+            .setComment("Test comment")
+            .setFork("Prague")
+            .setTraceLines(42)
+            .setGeneratedAt("2025-12-08T12:00:00Z");
+
+    assertThat(metadata.getComment()).isEqualTo("Test comment");
+    assertThat(metadata.getFork()).isEqualTo("Prague");
+    assertThat(metadata.getTraceLines()).isEqualTo(42);
+    assertThat(metadata.getGeneratedAt()).isEqualTo("2025-12-08T12:00:00Z");
+  }
+
+  @Test
+  void crossVMMetadata_specVersion_isCorrect() {
+    assertThat(CrossVMMetadata.CROSSVM_SPEC_VERSION).isEqualTo("1.0");
   }
 }

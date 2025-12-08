@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,16 +40,19 @@ import org.slf4j.LoggerFactory;
  * <p>Output files:
  *
  * <ul>
- *   <li>divergence_N.json - Raw test input that caused divergence
+ *   <li>divergence_N.json - Raw test input that caused divergence (with Besu's _info embedded)
  *   <li>crossvm_divergences.log - Append-only log of all divergences
- *   <li>divergence_report_N.json (optional) - Extended report with comparison details
+ *   <li>divergence_report_N.json - Extended report with comparison details
  * </ul>
+ *
+ * <p>The divergence files use the EEST _info format per CROSSVM_INFO_SPEC.md.
  */
 public class ConsensusDivergenceManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ConsensusDivergenceManager.class);
   private static final String LOG_FILE = "crossvm_divergences.log";
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final ObjectMapper OBJECT_MAPPER =
+      new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
   private final File crashDir;
   private final Path logFilePath;
@@ -59,6 +63,7 @@ public class ConsensusDivergenceManager {
   private final Object fileLock = new Object();
 
   private final String besuVersion;
+  private final CrossVMMetadataWriter metadataWriter;
 
   /**
    * Creates a new ConsensusDivergenceManager.
@@ -76,6 +81,7 @@ public class ConsensusDivergenceManager {
     this.totalVerified = new AtomicLong(0);
     this.totalDivergences = new AtomicLong(0);
     this.uniqueDivergences = new AtomicLong(0);
+    this.metadataWriter = new CrossVMMetadataWriter("besu", besuVersion);
 
     if (!crashDir.exists() && !crashDir.mkdirs()) {
       throw new IOException("Failed to create crash directory: " + crashDir);
@@ -97,6 +103,23 @@ public class ConsensusDivergenceManager {
    */
   public boolean saveDivergence(
       final EnhancedCorpusEntry entry, final TracingResult besuResult, final int workerId) {
+    return saveDivergence(entry, besuResult, workerId, null);
+  }
+
+  /**
+   * Records and saves a consensus divergence with fork information.
+   *
+   * @param entry the corpus entry that caused the divergence
+   * @param besuResult the result from Besu's execution
+   * @param workerId the worker thread ID
+   * @param fork the fork name used for execution (optional)
+   * @return true if this is a new unique divergence, false if duplicate
+   */
+  public boolean saveDivergence(
+      final EnhancedCorpusEntry entry,
+      final TracingResult besuResult,
+      final int workerId,
+      final String fork) {
 
     CrossVMMetadata otherMeta = entry.getMetadata();
     if (otherMeta == null) {
@@ -115,8 +138,8 @@ public class ConsensusDivergenceManager {
 
     synchronized (fileLock) {
       try {
-        // 1. Save raw test input
-        saveDivergenceFile(entry.getTestRaw(), divergenceId);
+        // 1. Save test with Besu's _info metadata embedded (EEST format)
+        saveDivergenceFile(entry, besuResult, fork, divergenceId);
 
         // 2. Append to log file
         logDivergence(
@@ -126,7 +149,7 @@ public class ConsensusDivergenceManager {
             besuResult.getTraceHash());
 
         // 3. Save extended report
-        saveExtendedReport(divergenceId, entry, otherMeta, besuResult, workerId);
+        saveExtendedReport(divergenceId, entry, otherMeta, besuResult, workerId, fork);
 
         LOG.warn(
             "[CONSENSUS DIVERGENCE #{}] {} expected={} besu={}",
@@ -146,15 +169,25 @@ public class ConsensusDivergenceManager {
   }
 
   /**
-   * Saves the raw test input file.
+   * Saves the test file with Besu's cross-VM metadata embedded using EEST _info format.
    *
-   * @param testInput the raw JSON bytes
+   * @param entry the corpus entry
+   * @param besuResult the result from Besu's execution
+   * @param fork the fork name used for execution (optional)
    * @param divergenceId the divergence ID
    */
-  private void saveDivergenceFile(final byte[] testInput, final int divergenceId)
+  private void saveDivergenceFile(
+      final EnhancedCorpusEntry entry,
+      final TracingResult besuResult,
+      final String fork,
+      final int divergenceId)
       throws IOException {
     Path file = crashDir.toPath().resolve(String.format("divergence_%d.json", divergenceId));
-    Files.write(file, testInput);
+
+    // Embed Besu's metadata in EEST format
+    byte[] testWithMetadata =
+        metadataWriter.embedMetadataPreservingInfo(entry.getTestRaw(), besuResult, fork);
+    Files.write(file, testWithMetadata);
   }
 
   /**
@@ -184,26 +217,39 @@ public class ConsensusDivergenceManager {
   }
 
   /**
-   * Saves an extended report with full comparison details.
+   * Saves an extended report with full comparison details following EEST conventions.
    *
    * @param divergenceId the divergence ID
    * @param entry the corpus entry
    * @param otherMeta the metadata from the other client
    * @param besuResult the result from Besu
    * @param workerId the worker ID
+   * @param fork the fork name used for execution (optional)
    */
   private void saveExtendedReport(
       final int divergenceId,
       final EnhancedCorpusEntry entry,
       final CrossVMMetadata otherMeta,
       final TracingResult besuResult,
-      final int workerId)
+      final int workerId,
+      final String fork)
       throws IOException {
 
     ObjectNode report = OBJECT_MAPPER.createObjectNode();
     report.put("divergenceId", divergenceId);
     report.put("detectedAt", Instant.now().toString());
     report.put("workerId", workerId);
+    report.put("crossvmVersion", CrossVMMetadata.CROSSVM_SPEC_VERSION);
+
+    if (fork != null && !fork.isEmpty()) {
+      report.put("fork", fork);
+    }
+
+    // Note about format
+    report.put("metadataFormat", entry.usesEestFormat() ? "eest_info" : "legacy_crossvm");
+    if (entry.getTestName() != null) {
+      report.put("testName", entry.getTestName());
+    }
 
     // Parse and include test without metadata
     try {
@@ -212,26 +258,47 @@ public class ConsensusDivergenceManager {
       report.put("testRaw", new String(entry.getTestWithoutMetadata(), StandardCharsets.UTF_8));
     }
 
-    // Source client info
+    // Source client info (the other client's metadata)
     ObjectNode source = OBJECT_MAPPER.createObjectNode();
     source.put("client", otherMeta.getGeneratedBy());
     source.put("version", otherMeta.getVersion());
     source.put("traceHash", otherMeta.getTraceHash());
     source.put("stateRoot", otherMeta.getStateRoot());
-    source.put("traceLines", otherMeta.getTraceLines());
+    if (otherMeta.getTraceLines() != null) {
+      source.put("traceLines", otherMeta.getTraceLines());
+    }
+    if (otherMeta.getCrossvmVersion() != null) {
+      source.put("crossvmVersion", otherMeta.getCrossvmVersion());
+    }
+    if (otherMeta.getFork() != null) {
+      source.put("fork", otherMeta.getFork());
+    }
     report.set("source", source);
 
-    // Besu info
+    // Besu info (this client's result)
     ObjectNode besu = OBJECT_MAPPER.createObjectNode();
     besu.put("client", "besu");
     besu.put("version", besuVersion);
     besu.put("traceHash", besuResult.getTraceHash());
     besu.put("stateRoot", besuResult.getStateRoot());
     besu.put("traceLines", besuResult.getTraceLines());
+    besu.put("crossvmVersion", CrossVMMetadata.CROSSVM_SPEC_VERSION);
+    if (fork != null && !fork.isEmpty()) {
+      besu.put("fork", fork);
+    }
     report.set("besu", besu);
 
+    // Comparison summary
+    ObjectNode comparison = OBJECT_MAPPER.createObjectNode();
+    comparison.put("traceHashMatch", otherMeta.getTraceHash().equals(besuResult.getTraceHash()));
+    comparison.put(
+        "stateRootMatch",
+        otherMeta.getStateRoot() != null
+            && otherMeta.getStateRoot().equals(besuResult.getStateRoot()));
+    report.set("comparison", comparison);
+
     Path file = crashDir.toPath().resolve(String.format("divergence_report_%d.json", divergenceId));
-    OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), report);
+    OBJECT_MAPPER.writeValue(file.toFile(), report);
   }
 
   /**
