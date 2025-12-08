@@ -53,8 +53,7 @@ class CrossVMDebugTest {
 
     // Test case 5: Full 32-byte word
     Bytes val5 =
-        Bytes.fromHexString(
-            "0x0000000000000000000000000000000000000000000000000000000000000001");
+        Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000001");
     System.out.println("32-byte 1 -> " + TraceNormalizer.formatStackItem(val5));
 
     // Test case 6: Address-like value
@@ -112,7 +111,10 @@ class CrossVMDebugTest {
 
     normalizer.processLog(log1);
     normalizer.finish("0xabc123");
-    System.out.println("Depth=0 entry: line count = " + normalizer.getLineCount() + " (expect 1 for stateRoot only)");
+    System.out.println(
+        "Depth=0 entry: line count = "
+            + normalizer.getLineCount()
+            + " (expect 1 for stateRoot only)");
 
     // Reset and test STOP filtering
     normalizer.reset();
@@ -126,7 +128,10 @@ class CrossVMDebugTest {
 
     normalizer.processLog(log2);
     normalizer.finish("0xabc123");
-    System.out.println("STOP opcode: line count = " + normalizer.getLineCount() + " (expect 1 for stateRoot only)");
+    System.out.println(
+        "STOP opcode: line count = "
+            + normalizer.getLineCount()
+            + " (expect 1 for stateRoot only)");
 
     // Reset and test valid entry
     normalizer.reset();
@@ -140,7 +145,10 @@ class CrossVMDebugTest {
 
     normalizer.processLog(log3);
     normalizer.finish("0xabc123");
-    System.out.println("Valid PUSH1: line count = " + normalizer.getLineCount() + " (expect 2: 1 oplog + 1 stateRoot)");
+    System.out.println(
+        "Valid PUSH1: line count = "
+            + normalizer.getLineCount()
+            + " (expect 2: 1 oplog + 1 stateRoot)");
   }
 
   @Test
@@ -230,7 +238,9 @@ class CrossVMDebugTest {
       if (line.contains("\"_result\":")) {
         hasResult = true;
       }
-      if (line.contains("\"depth\":") && !line.contains("\"_filtered\"") && !line.contains("\"_meta\"")) {
+      if (line.contains("\"depth\":")
+          && !line.contains("\"_filtered\"")
+          && !line.contains("\"_meta\"")) {
         traceLines++;
       }
     }

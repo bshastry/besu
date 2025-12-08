@@ -20,7 +20,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.tuweni.bytes.Bytes;
 import org.slf4j.Logger;
@@ -227,6 +229,207 @@ public class TraceNormalizer {
   }
 
   /**
+   * Opcode name lookup table matching geth's opCodeToString. This ensures cross-VM trace
+   * compatibility by using identical opcode names.
+   */
+  private static final Map<Integer, String> OPCODE_NAMES = new HashMap<>();
+
+  static {
+    // Stop and Arithmetic Operations
+    OPCODE_NAMES.put(0x00, "STOP");
+    OPCODE_NAMES.put(0x01, "ADD");
+    OPCODE_NAMES.put(0x02, "MUL");
+    OPCODE_NAMES.put(0x03, "SUB");
+    OPCODE_NAMES.put(0x04, "DIV");
+    OPCODE_NAMES.put(0x05, "SDIV");
+    OPCODE_NAMES.put(0x06, "MOD");
+    OPCODE_NAMES.put(0x07, "SMOD");
+    OPCODE_NAMES.put(0x08, "ADDMOD");
+    OPCODE_NAMES.put(0x09, "MULMOD");
+    OPCODE_NAMES.put(0x0a, "EXP");
+    OPCODE_NAMES.put(0x0b, "SIGNEXTEND");
+
+    // Comparison & Bitwise Logic Operations
+    OPCODE_NAMES.put(0x10, "LT");
+    OPCODE_NAMES.put(0x11, "GT");
+    OPCODE_NAMES.put(0x12, "SLT");
+    OPCODE_NAMES.put(0x13, "SGT");
+    OPCODE_NAMES.put(0x14, "EQ");
+    OPCODE_NAMES.put(0x15, "ISZERO");
+    OPCODE_NAMES.put(0x16, "AND");
+    OPCODE_NAMES.put(0x17, "OR");
+    OPCODE_NAMES.put(0x18, "XOR");
+    OPCODE_NAMES.put(0x19, "NOT");
+    OPCODE_NAMES.put(0x1a, "BYTE");
+    OPCODE_NAMES.put(0x1b, "SHL");
+    OPCODE_NAMES.put(0x1c, "SHR");
+    OPCODE_NAMES.put(0x1d, "SAR");
+
+    // SHA3
+    OPCODE_NAMES.put(0x20, "KECCAK256");
+
+    // Environmental Information
+    OPCODE_NAMES.put(0x30, "ADDRESS");
+    OPCODE_NAMES.put(0x31, "BALANCE");
+    OPCODE_NAMES.put(0x32, "ORIGIN");
+    OPCODE_NAMES.put(0x33, "CALLER");
+    OPCODE_NAMES.put(0x34, "CALLVALUE");
+    OPCODE_NAMES.put(0x35, "CALLDATALOAD");
+    OPCODE_NAMES.put(0x36, "CALLDATASIZE");
+    OPCODE_NAMES.put(0x37, "CALLDATACOPY");
+    OPCODE_NAMES.put(0x38, "CODESIZE");
+    OPCODE_NAMES.put(0x39, "CODECOPY");
+    OPCODE_NAMES.put(0x3a, "GASPRICE");
+    OPCODE_NAMES.put(0x3b, "EXTCODESIZE");
+    OPCODE_NAMES.put(0x3c, "EXTCODECOPY");
+    OPCODE_NAMES.put(0x3d, "RETURNDATASIZE");
+    OPCODE_NAMES.put(0x3e, "RETURNDATACOPY");
+    OPCODE_NAMES.put(0x3f, "EXTCODEHASH");
+
+    // Block Information
+    OPCODE_NAMES.put(0x40, "BLOCKHASH");
+    OPCODE_NAMES.put(0x41, "COINBASE");
+    OPCODE_NAMES.put(0x42, "TIMESTAMP");
+    OPCODE_NAMES.put(0x43, "NUMBER");
+    OPCODE_NAMES.put(0x44, "PREVRANDAO");
+    OPCODE_NAMES.put(0x45, "GASLIMIT");
+    OPCODE_NAMES.put(0x46, "CHAINID");
+    OPCODE_NAMES.put(0x47, "SELFBALANCE");
+    OPCODE_NAMES.put(0x48, "BASEFEE");
+    OPCODE_NAMES.put(0x49, "BLOBHASH");
+    OPCODE_NAMES.put(0x4a, "BLOBBASEFEE");
+
+    // Stack, Memory, Storage and Flow Operations
+    OPCODE_NAMES.put(0x50, "POP");
+    OPCODE_NAMES.put(0x51, "MLOAD");
+    OPCODE_NAMES.put(0x52, "MSTORE");
+    OPCODE_NAMES.put(0x53, "MSTORE8");
+    OPCODE_NAMES.put(0x54, "SLOAD");
+    OPCODE_NAMES.put(0x55, "SSTORE");
+    OPCODE_NAMES.put(0x56, "JUMP");
+    OPCODE_NAMES.put(0x57, "JUMPI");
+    OPCODE_NAMES.put(0x58, "PC");
+    OPCODE_NAMES.put(0x59, "MSIZE");
+    OPCODE_NAMES.put(0x5a, "GAS");
+    OPCODE_NAMES.put(0x5b, "JUMPDEST");
+    OPCODE_NAMES.put(0x5c, "TLOAD");
+    OPCODE_NAMES.put(0x5d, "TSTORE");
+    OPCODE_NAMES.put(0x5e, "MCOPY");
+    OPCODE_NAMES.put(0x5f, "PUSH0");
+
+    // Push Operations
+    OPCODE_NAMES.put(0x60, "PUSH1");
+    OPCODE_NAMES.put(0x61, "PUSH2");
+    OPCODE_NAMES.put(0x62, "PUSH3");
+    OPCODE_NAMES.put(0x63, "PUSH4");
+    OPCODE_NAMES.put(0x64, "PUSH5");
+    OPCODE_NAMES.put(0x65, "PUSH6");
+    OPCODE_NAMES.put(0x66, "PUSH7");
+    OPCODE_NAMES.put(0x67, "PUSH8");
+    OPCODE_NAMES.put(0x68, "PUSH9");
+    OPCODE_NAMES.put(0x69, "PUSH10");
+    OPCODE_NAMES.put(0x6a, "PUSH11");
+    OPCODE_NAMES.put(0x6b, "PUSH12");
+    OPCODE_NAMES.put(0x6c, "PUSH13");
+    OPCODE_NAMES.put(0x6d, "PUSH14");
+    OPCODE_NAMES.put(0x6e, "PUSH15");
+    OPCODE_NAMES.put(0x6f, "PUSH16");
+    OPCODE_NAMES.put(0x70, "PUSH17");
+    OPCODE_NAMES.put(0x71, "PUSH18");
+    OPCODE_NAMES.put(0x72, "PUSH19");
+    OPCODE_NAMES.put(0x73, "PUSH20");
+    OPCODE_NAMES.put(0x74, "PUSH21");
+    OPCODE_NAMES.put(0x75, "PUSH22");
+    OPCODE_NAMES.put(0x76, "PUSH23");
+    OPCODE_NAMES.put(0x77, "PUSH24");
+    OPCODE_NAMES.put(0x78, "PUSH25");
+    OPCODE_NAMES.put(0x79, "PUSH26");
+    OPCODE_NAMES.put(0x7a, "PUSH27");
+    OPCODE_NAMES.put(0x7b, "PUSH28");
+    OPCODE_NAMES.put(0x7c, "PUSH29");
+    OPCODE_NAMES.put(0x7d, "PUSH30");
+    OPCODE_NAMES.put(0x7e, "PUSH31");
+    OPCODE_NAMES.put(0x7f, "PUSH32");
+
+    // Duplication Operations
+    OPCODE_NAMES.put(0x80, "DUP1");
+    OPCODE_NAMES.put(0x81, "DUP2");
+    OPCODE_NAMES.put(0x82, "DUP3");
+    OPCODE_NAMES.put(0x83, "DUP4");
+    OPCODE_NAMES.put(0x84, "DUP5");
+    OPCODE_NAMES.put(0x85, "DUP6");
+    OPCODE_NAMES.put(0x86, "DUP7");
+    OPCODE_NAMES.put(0x87, "DUP8");
+    OPCODE_NAMES.put(0x88, "DUP9");
+    OPCODE_NAMES.put(0x89, "DUP10");
+    OPCODE_NAMES.put(0x8a, "DUP11");
+    OPCODE_NAMES.put(0x8b, "DUP12");
+    OPCODE_NAMES.put(0x8c, "DUP13");
+    OPCODE_NAMES.put(0x8d, "DUP14");
+    OPCODE_NAMES.put(0x8e, "DUP15");
+    OPCODE_NAMES.put(0x8f, "DUP16");
+
+    // Exchange Operations
+    OPCODE_NAMES.put(0x90, "SWAP1");
+    OPCODE_NAMES.put(0x91, "SWAP2");
+    OPCODE_NAMES.put(0x92, "SWAP3");
+    OPCODE_NAMES.put(0x93, "SWAP4");
+    OPCODE_NAMES.put(0x94, "SWAP5");
+    OPCODE_NAMES.put(0x95, "SWAP6");
+    OPCODE_NAMES.put(0x96, "SWAP7");
+    OPCODE_NAMES.put(0x97, "SWAP8");
+    OPCODE_NAMES.put(0x98, "SWAP9");
+    OPCODE_NAMES.put(0x99, "SWAP10");
+    OPCODE_NAMES.put(0x9a, "SWAP11");
+    OPCODE_NAMES.put(0x9b, "SWAP12");
+    OPCODE_NAMES.put(0x9c, "SWAP13");
+    OPCODE_NAMES.put(0x9d, "SWAP14");
+    OPCODE_NAMES.put(0x9e, "SWAP15");
+    OPCODE_NAMES.put(0x9f, "SWAP16");
+
+    // Logging Operations
+    OPCODE_NAMES.put(0xa0, "LOG0");
+    OPCODE_NAMES.put(0xa1, "LOG1");
+    OPCODE_NAMES.put(0xa2, "LOG2");
+    OPCODE_NAMES.put(0xa3, "LOG3");
+    OPCODE_NAMES.put(0xa4, "LOG4");
+
+    // System Operations
+    OPCODE_NAMES.put(0xf0, "CREATE");
+    OPCODE_NAMES.put(0xf1, "CALL");
+    OPCODE_NAMES.put(0xf2, "CALLCODE");
+    OPCODE_NAMES.put(0xf3, "RETURN");
+    OPCODE_NAMES.put(0xf4, "DELEGATECALL");
+    OPCODE_NAMES.put(0xf5, "CREATE2");
+    OPCODE_NAMES.put(0xf7, "RETURNDATALOAD");
+    OPCODE_NAMES.put(0xf8, "EXTCALL");
+    OPCODE_NAMES.put(0xf9, "EXTDELEGATECALL");
+    OPCODE_NAMES.put(0xfa, "STATICCALL");
+    OPCODE_NAMES.put(0xfb, "EXTSTATICCALL");
+    OPCODE_NAMES.put(0xfd, "REVERT");
+    OPCODE_NAMES.put(0xfe, "INVALID");
+    OPCODE_NAMES.put(0xff, "SELFDESTRUCT");
+  }
+
+  /**
+   * Derives the opcode name from the opcode byte, matching geth's vm.OpCode(op).String() behavior.
+   * For defined opcodes, returns the standard name. For undefined opcodes, returns "opcode 0x%x not
+   * defined" format (matching geth's fmt.Sprintf("opcode %#x not defined", int(op))).
+   *
+   * @param op the opcode byte
+   * @return the opcode name matching geth's format
+   */
+  public static String deriveOpName(final int op) {
+    int opcode = op & 0xFF;
+    String name = OPCODE_NAMES.get(opcode);
+    if (name != null) {
+      return name;
+    }
+    // Match geth's format: "opcode 0xd not defined" (lowercase hex, no leading zero)
+    return String.format("opcode 0x%x not defined", opcode);
+  }
+
+  /**
    * Produces deterministic JSON output for an oplog. Field order must match geth exactly: depth,
    * pc, [section], [functionDepth], gas, op, opName, stack
    *
@@ -269,9 +472,9 @@ public class TraceNormalizer {
     b.append(Integer.toHexString(op));
     b.append('"');
 
-    // opName (always)
+    // opName (always) - derive from opcode to match geth's vm.OpCode(op).String()
     b.append(",\"opName\":\"");
-    b.append(log.getOpName() != null ? log.getOpName() : "UNKNOWN");
+    b.append(deriveOpName(op));
     b.append('"');
 
     // stack (array of hex strings, last 6 items, lowercase, minimal representation)
