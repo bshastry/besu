@@ -16,7 +16,6 @@ package org.hyperledger.besu.testfuzz.tracing;
 
 import org.hyperledger.besu.evm.frame.MessageFrame;
 import org.hyperledger.besu.evm.operation.Operation;
-import org.hyperledger.besu.evm.operation.Operation.OperationResult;
 import org.hyperledger.besu.evm.tracing.OperationTracer;
 
 import java.util.ArrayList;
@@ -35,6 +34,13 @@ import org.apache.tuweni.bytes.Bytes;
  * // ... execute transaction with tracer ...
  * TracingResult result = tracer.finish(worldState.rootHash().toHexString());
  * }</pre>
+ *
+ * <p>For debugging, you can provide a DumpTraceWriter to output trace lines:
+ *
+ * <pre>{@code
+ * DumpTraceWriter dumpWriter = new DumpTraceWriter("trace.jsonl", true);
+ * NormalizingOperationTracer tracer = new NormalizingOperationTracer(dumpWriter);
+ * }</pre>
  */
 public class NormalizingOperationTracer implements OperationTracer {
 
@@ -45,8 +51,19 @@ public class NormalizingOperationTracer implements OperationTracer {
     this.normalizer = new TraceNormalizer();
   }
 
+  /**
+   * Creates a new NormalizingOperationTracer with a dump writer for debugging.
+   *
+   * @param dumpWriter the dump writer for outputting trace lines (may be null)
+   */
+  public NormalizingOperationTracer(final DumpTraceWriter dumpWriter) {
+    this.normalizer = new TraceNormalizer(dumpWriter);
+  }
+
   @Override
-  public void tracePostExecution(final MessageFrame frame, final OperationResult operationResult) {
+  public void tracePreExecution(final MessageFrame frame) {
+    // Use pre-execution tracing to match geth's OnOpcode hook
+    // This captures state BEFORE the operation executes
     CanonicalOpLog log = new CanonicalOpLog();
 
     // Depth: MessageFrame.getDepth() returns 0 for rootmost call
@@ -56,7 +73,7 @@ public class NormalizingOperationTracer implements OperationTracer {
     // Program counter
     log.setPc(frame.getPC());
 
-    // Gas remaining (before operation cost is deducted, we capture post-execution state)
+    // Gas remaining BEFORE execution (matches geth's OnOpcode gas parameter)
     log.setGas(frame.getRemainingGas());
 
     // Opcode
@@ -73,14 +90,15 @@ public class NormalizingOperationTracer implements OperationTracer {
     // log.setSection(...)
     // log.setFunctionDepth(...)
 
-    // Capture last 6 stack items
+    // Capture last 6 stack items (from bottom to top)
+    // geth's StackData() returns stack from bottom to top
     int stackSize = frame.stackSize();
     List<Bytes> stack = new ArrayList<>();
     int start = Math.max(0, stackSize - 6);
     for (int i = start; i < stackSize; i++) {
-      // getStackItem(0) is top of stack, we want oldest to newest
-      // So we read from (stackSize - 1 - i) perspective
-      // Actually, we need to capture from bottom to top for last 6
+      // getStackItem(0) is top of stack in Besu
+      // We want items from bottom to top (like geth's StackData)
+      // So item at index i (from bottom) is at offset (stackSize - 1 - i) from top
       int offset = stackSize - 1 - i;
       try {
         Bytes item = frame.getStackItem(offset);
@@ -110,6 +128,15 @@ public class NormalizingOperationTracer implements OperationTracer {
   /** Resets the tracer for reuse. */
   public void reset() {
     normalizer.reset();
+  }
+
+  /**
+   * Gets the underlying normalizer.
+   *
+   * @return the trace normalizer
+   */
+  public TraceNormalizer getNormalizer() {
+    return normalizer;
   }
 
   /**

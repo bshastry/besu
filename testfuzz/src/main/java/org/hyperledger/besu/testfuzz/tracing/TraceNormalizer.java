@@ -16,12 +16,15 @@ package org.hyperledger.besu.testfuzz.tracing;
 
 import org.hyperledger.besu.crypto.MessageDigestFactory;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 
 import org.apache.tuweni.bytes.Bytes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Normalizes EVM traces to a canonical format for cross-VM comparison. This implementation matches
@@ -36,20 +39,35 @@ import org.apache.tuweni.bytes.Bytes;
  *   <li>Stack: last 6 items only, lowercase hex, minimal representation (no leading zeros)
  *   <li>Include stateRoot as final line before hash finalization
  * </ul>
+ *
+ * <p>Optionally accepts a {@link DumpTraceWriter} to output trace lines for debugging divergences.
  */
 public class TraceNormalizer {
 
+  private static final Logger LOG = LoggerFactory.getLogger(TraceNormalizer.class);
+
   private final MessageDigest md5;
+  private final DumpTraceWriter dumpWriter;
   private int lineCount;
   private CanonicalOpLog prev; // For duplicate line detection
 
   /** Creates a new TraceNormalizer. */
   public TraceNormalizer() {
+    this(null);
+  }
+
+  /**
+   * Creates a new TraceNormalizer with optional dump writer.
+   *
+   * @param dumpWriter optional writer for dumping trace lines (may be null)
+   */
+  public TraceNormalizer(final DumpTraceWriter dumpWriter) {
     try {
       this.md5 = MessageDigestFactory.create("MD5");
     } catch (NoSuchAlgorithmException e) {
       throw new RuntimeException("MD5 algorithm not available", e);
     }
+    this.dumpWriter = dumpWriter;
     this.lineCount = 0;
     this.prev = null;
   }
@@ -62,11 +80,13 @@ public class TraceNormalizer {
   public void processLog(final CanonicalOpLog log) {
     // Filter 1: depth=0 means not a real opcode
     if (log.getDepth() == 0) {
+      writeFiltered(DumpTraceWriter.FilterReason.DEPTH_ZERO, log);
       return;
     }
 
     // Filter 2: STOP opcodes (geth continues on virtual STOP at end of code)
     if (log.getOp() == 0x00) {
+      writeFiltered(DumpTraceWriter.FilterReason.STOP_OPCODE, log);
       return;
     }
 
@@ -75,6 +95,7 @@ public class TraceNormalizer {
         && prev.getPc() == log.getPc()
         && prev.getDepth() == log.getDepth()
         && prev.getFunctionDepth() == log.getFunctionDepth()) {
+      writeFiltered(DumpTraceWriter.FilterReason.DUPLICATE, log);
       return; // Skip duplicate
     }
 
@@ -83,6 +104,22 @@ public class TraceNormalizer {
       writeNormalized(prev);
     }
     prev = log;
+  }
+
+  /**
+   * Writes a filtered entry to the dump writer (if present).
+   *
+   * @param reason the filter reason
+   * @param log the filtered log entry
+   */
+  private void writeFiltered(final DumpTraceWriter.FilterReason reason, final CanonicalOpLog log) {
+    if (dumpWriter != null) {
+      try {
+        dumpWriter.writeFiltered(reason, log);
+      } catch (IOException e) {
+        LOG.warn("Failed to write filtered entry to dump file", e);
+      }
+    }
   }
 
   /**
@@ -105,7 +142,42 @@ public class TraceNormalizer {
     md5.update((byte) '\n');
     lineCount++;
 
-    return md5.digest();
+    // Write state root to dump file
+    if (dumpWriter != null) {
+      try {
+        dumpWriter.writeStateRoot(stateRoot);
+      } catch (IOException e) {
+        LOG.warn("Failed to write state root to dump file", e);
+      }
+    }
+
+    byte[] hash = md5.digest();
+
+    // Write result footer to dump file
+    if (dumpWriter != null) {
+      try {
+        String hashHex = bytesToHex(hash);
+        dumpWriter.writeResult(hashHex, lineCount);
+      } catch (IOException e) {
+        LOG.warn("Failed to write result to dump file", e);
+      }
+    }
+
+    return hash;
+  }
+
+  /**
+   * Converts bytes to lowercase hex string.
+   *
+   * @param bytes the bytes
+   * @return lowercase hex string
+   */
+  private static String bytesToHex(final byte[] bytes) {
+    StringBuilder hex = new StringBuilder(bytes.length * 2);
+    for (byte b : bytes) {
+      hex.append(String.format("%02x", b & 0xFF));
+    }
+    return hex.toString();
   }
 
   /**
@@ -125,6 +197,15 @@ public class TraceNormalizer {
   }
 
   /**
+   * Gets the dump writer (if any).
+   *
+   * @return the dump writer, or null if none
+   */
+  public DumpTraceWriter getDumpWriter() {
+    return dumpWriter;
+  }
+
+  /**
    * Writes a normalized log entry to the MD5 hasher.
    *
    * @param log the log entry
@@ -134,6 +215,15 @@ public class TraceNormalizer {
     md5.update(data);
     md5.update((byte) '\n');
     lineCount++;
+
+    // Also write to dump file if present
+    if (dumpWriter != null) {
+      try {
+        dumpWriter.writeTraceLine(log);
+      } catch (IOException e) {
+        LOG.warn("Failed to write trace line to dump file", e);
+      }
+    }
   }
 
   /**
@@ -143,7 +233,7 @@ public class TraceNormalizer {
    * @param log the log entry
    * @return the canonical JSON bytes
    */
-  static byte[] canonicalMarshal(final CanonicalOpLog log) {
+  public static byte[] canonicalMarshal(final CanonicalOpLog log) {
     StringBuilder b = new StringBuilder(256);
 
     // depth (always, decimal)
@@ -212,7 +302,7 @@ public class TraceNormalizer {
    * @param item the stack item (may be null)
    * @return the formatted hex string
    */
-  static String formatStackItem(final Bytes item) {
+  public static String formatStackItem(final Bytes item) {
     if (item == null || item.isEmpty()) {
       return "0x0";
     }
