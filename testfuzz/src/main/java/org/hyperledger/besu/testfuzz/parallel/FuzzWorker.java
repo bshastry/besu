@@ -15,9 +15,12 @@
 package org.hyperledger.besu.testfuzz.parallel;
 
 import org.hyperledger.besu.testfuzz.StateTestExecutor;
+import org.hyperledger.besu.testfuzz.crossvm.ConsensusDivergenceManager;
+import org.hyperledger.besu.testfuzz.crossvm.EnhancedCorpusEntry;
 import org.hyperledger.besu.testfuzz.statetest.CombinedMutationStrategy;
 import org.hyperledger.besu.testfuzz.statetest.MutationStrategy;
 import org.hyperledger.besu.testfuzz.statetest.StateTestCorpusProvider;
+import org.hyperledger.besu.testfuzz.tracing.TracingResult;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -56,11 +59,13 @@ public class FuzzWorker implements Runnable {
   private static final int DEFAULT_MUTATIONS_PER_ENTRY = 8;
   private static final int DEFAULT_COVERAGE_CHECK_INTERVAL = 1;
   private static final long POLL_TIMEOUT_MS = 100;
+  private static final String THIS_CLIENT = "besu";
 
   private final int workerId;
   private final InputQueue inputQueue;
   private final CoverageTracker coverageTracker;
   private final CrashManager crashManager;
+  private final ConsensusDivergenceManager divergenceManager; // May be null
   private final AtomicBoolean stopFlag;
   private final String fork;
   private final List<byte[]> corpusForSplicing;
@@ -98,10 +103,43 @@ public class FuzzWorker implements Runnable {
       final AtomicBoolean stopFlag,
       final String fork,
       final List<byte[]> corpusForSplicing) {
+    this(
+        workerId,
+        inputQueue,
+        coverageTracker,
+        crashManager,
+        null, // No divergence manager
+        stopFlag,
+        fork,
+        corpusForSplicing);
+  }
+
+  /**
+   * Creates a new FuzzWorker with cross-VM consensus verification support.
+   *
+   * @param workerId unique ID for this worker
+   * @param inputQueue shared input queue
+   * @param coverageTracker shared coverage tracker
+   * @param crashManager shared crash manager
+   * @param divergenceManager shared divergence manager (may be null)
+   * @param stopFlag shared stop flag
+   * @param fork the EVM fork to use
+   * @param corpusForSplicing shared corpus for splicing mutations
+   */
+  public FuzzWorker(
+      final int workerId,
+      final InputQueue inputQueue,
+      final CoverageTracker coverageTracker,
+      final CrashManager crashManager,
+      final ConsensusDivergenceManager divergenceManager,
+      final AtomicBoolean stopFlag,
+      final String fork,
+      final List<byte[]> corpusForSplicing) {
     this.workerId = workerId;
     this.inputQueue = inputQueue;
     this.coverageTracker = coverageTracker;
     this.crashManager = crashManager;
+    this.divergenceManager = divergenceManager;
     this.stopFlag = stopFlag;
     this.fork = fork;
     this.corpusForSplicing = corpusForSplicing;
@@ -154,6 +192,66 @@ public class FuzzWorker implements Runnable {
   private void processEntry(final CorpusEntry entry) {
     byte[] seedData = entry.getDataDirect();
 
+    // Check for cross-VM consensus verification
+    if (divergenceManager != null) {
+      EnhancedCorpusEntry enhanced = EnhancedCorpusEntry.parse(seedData);
+      if (enhanced.shouldVerifyAgainst(THIS_CLIENT)) {
+        // This is a corpus entry from another client - verify without mutation
+        verifyCrossVMConsensus(enhanced);
+        return; // Don't mutate entries from other clients
+      }
+    }
+
+    // Normal mutation path
+    processMutations(seedData, entry);
+  }
+
+  /**
+   * Verifies cross-VM consensus for an entry from another client.
+   *
+   * @param entry the enhanced corpus entry with cross-VM metadata
+   */
+  private void verifyCrossVMConsensus(final EnhancedCorpusEntry entry) {
+    iterations.incrementAndGet();
+
+    byte[] cleanTest = entry.getTestWithoutMetadata();
+
+    // Execute with tracing
+    TracingResult besuResult;
+    try {
+      besuResult = executor.executeWithTracing(cleanTest);
+    } catch (Exception e) {
+      executionErrors.incrementAndGet();
+      LOG.debug("Cross-VM verification execution error: {}", e.getMessage());
+      return;
+    }
+
+    if (besuResult == null || besuResult.getTraceHash() == null) {
+      LOG.debug("Cross-VM verification produced null result");
+      return;
+    }
+
+    String expectedHash = entry.getTraceHash();
+    if (expectedHash == null) {
+      return;
+    }
+
+    if (besuResult.getTraceHash().equals(expectedHash)) {
+      // Match! No consensus issue
+      divergenceManager.recordVerified();
+    } else {
+      // CONSENSUS DIVERGENCE DETECTED
+      divergenceManager.saveDivergence(entry, besuResult, workerId);
+    }
+  }
+
+  /**
+   * Performs the normal mutation-based fuzzing loop.
+   *
+   * @param seedData the seed data to mutate
+   * @param entry the corpus entry
+   */
+  private void processMutations(final byte[] seedData, final CorpusEntry entry) {
     // Apply multiple mutations to this entry
     for (int i = 0; i < mutationsPerEntry && !stopFlag.get(); i++) {
       iterations.incrementAndGet();

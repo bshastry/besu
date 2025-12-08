@@ -48,6 +48,11 @@ dependencies {
   implementation 'org.jacoco:org.jacoco.core'
   implementation 'org.mockito:mockito-core'
   implementation 'org.slf4j:slf4j-api'
+
+  testImplementation 'org.assertj:assertj-core'
+  testImplementation 'org.junit.jupiter:junit-jupiter-api'
+  testImplementation 'org.junit.jupiter:junit-jupiter-params'
+  testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
 }
 
 application {

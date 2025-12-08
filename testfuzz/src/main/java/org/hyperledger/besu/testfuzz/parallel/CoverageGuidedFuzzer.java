@@ -14,6 +14,8 @@
  */
 package org.hyperledger.besu.testfuzz.parallel;
 
+import org.hyperledger.besu.testfuzz.crossvm.ConsensusDivergenceManager;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -58,11 +60,14 @@ public class CoverageGuidedFuzzer {
   private final File newCorpusDir;
   private final File crashDir;
   private final Duration timeout;
+  private final boolean enableCrossVMVerification;
+  private final String besuVersion;
 
   // Core components
   private CoverageTracker coverageTracker;
   private InputQueue inputQueue;
   private CrashManager crashManager;
+  private ConsensusDivergenceManager divergenceManager; // May be null if not enabled
   private List<FuzzWorker> workers;
   private List<byte[]> corpus;
 
@@ -82,6 +87,16 @@ public class CoverageGuidedFuzzer {
     this.newCorpusDir = builder.newCorpusDir;
     this.crashDir = builder.crashDir != null ? builder.crashDir : new File("crashes");
     this.timeout = builder.timeout;
+    this.enableCrossVMVerification = builder.enableCrossVMVerification;
+    this.besuVersion = builder.besuVersion != null ? builder.besuVersion : getDefaultBesuVersion();
+  }
+
+  private static String getDefaultBesuVersion() {
+    Package pkg = CoverageGuidedFuzzer.class.getPackage();
+    if (pkg != null && pkg.getImplementationVersion() != null) {
+      return pkg.getImplementationVersion();
+    }
+    return "dev";
   }
 
   /**
@@ -103,6 +118,8 @@ public class CoverageGuidedFuzzer {
         "Guidance regexp: %s%n", guidanceRegexp != null ? guidanceRegexp : "(all classes)");
     System.out.printf("Corpus: %d files%n", corpus.size());
     System.out.printf("Timeout: %s%n", timeout != null ? timeout : "infinite");
+    System.out.printf(
+        "Cross-VM verification: %s%n", enableCrossVMVerification ? "enabled" : "disabled");
     System.out.println();
 
     // Start workers
@@ -135,6 +152,11 @@ public class CoverageGuidedFuzzer {
 
     // Initialize crash manager
     crashManager = new CrashManager(crashDir);
+
+    // Initialize cross-VM divergence manager if enabled
+    if (enableCrossVMVerification) {
+      divergenceManager = new ConsensusDivergenceManager(crashDir, besuVersion);
+    }
 
     // Load corpus
     corpus = loadCorpus(corpusDir);
@@ -212,6 +234,7 @@ public class CoverageGuidedFuzzer {
               inputQueue,
               coverageTracker,
               crashManager,
+              divergenceManager, // May be null if cross-VM verification is disabled
               stopFlag,
               fork,
               corpus // Shared read-only corpus for splicing
@@ -296,6 +319,11 @@ public class CoverageGuidedFuzzer {
     for (FuzzWorker worker : workers) {
       System.out.printf("  %s%n", worker.getStats());
     }
+
+    // Print cross-VM verification summary if enabled
+    if (divergenceManager != null) {
+      divergenceManager.printFinalSummary();
+    }
   }
 
   private String formatDuration(final Duration d) {
@@ -314,6 +342,8 @@ public class CoverageGuidedFuzzer {
     private File newCorpusDir;
     private File crashDir;
     private Duration timeout;
+    private boolean enableCrossVMVerification = false;
+    private String besuVersion;
 
     /**
      * Sets the number of worker threads.
@@ -389,6 +419,32 @@ public class CoverageGuidedFuzzer {
      */
     public Builder timeout(final Duration t) {
       this.timeout = t;
+      return this;
+    }
+
+    /**
+     * Enables or disables cross-VM consensus verification.
+     *
+     * <p>When enabled, corpus entries containing _crossvm metadata from other clients (e.g., geth)
+     * will be executed and their trace hashes compared against the expected values to detect
+     * consensus divergences.
+     *
+     * @param enable true to enable cross-VM verification
+     * @return this builder
+     */
+    public Builder enableCrossVMVerification(final boolean enable) {
+      this.enableCrossVMVerification = enable;
+      return this;
+    }
+
+    /**
+     * Sets the Besu version string for cross-VM reports.
+     *
+     * @param version the Besu version (e.g., "24.12.0")
+     * @return this builder
+     */
+    public Builder besuVersion(final String version) {
+      this.besuVersion = version;
       return this;
     }
 

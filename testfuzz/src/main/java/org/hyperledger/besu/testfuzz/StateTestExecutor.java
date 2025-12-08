@@ -36,6 +36,8 @@ import org.hyperledger.besu.evm.account.Account;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
 import org.hyperledger.besu.evm.tracing.OperationTracer;
 import org.hyperledger.besu.evm.worldstate.WorldUpdater;
+import org.hyperledger.besu.testfuzz.tracing.NormalizingOperationTracer;
+import org.hyperledger.besu.testfuzz.tracing.TracingResult;
 
 import java.util.List;
 import java.util.Map;
@@ -360,6 +362,161 @@ public class StateTestExecutor {
     String stateRoot = worldState.rootHash().toHexString();
 
     return ExecutionResult.success(stateRoot, gasUsed);
+  }
+
+  /**
+   * Executes a state test with trace normalization for cross-VM comparison. This method captures
+   * EVM execution steps and produces an MD5 hash compatible with geth's statetest fuzzer.
+   *
+   * @param jsonData the state test JSON
+   * @return the tracing result containing MD5 hash, state root, and line count
+   */
+  public TracingResult executeWithTracing(final byte[] jsonData) {
+    totalExecutions.incrementAndGet();
+
+    // Parse the JSON
+    Map<String, GeneralStateTestCaseSpec> stateTests;
+    try {
+      stateTests = objectMapper.readValue(jsonData, stateTestType);
+    } catch (Exception e) {
+      parseErrors.incrementAndGet();
+      return new TracingResult(null, null, 0);
+    }
+
+    if (stateTests == null || stateTests.isEmpty()) {
+      parseErrors.incrementAndGet();
+      return new TracingResult(null, null, 0);
+    }
+
+    // Create tracer for this execution
+    NormalizingOperationTracer tracer = new NormalizingOperationTracer();
+    String finalStateRoot = null;
+
+    // Execute each test case
+    for (Map.Entry<String, GeneralStateTestCaseSpec> entry : stateTests.entrySet()) {
+      GeneralStateTestCaseSpec spec = entry.getValue();
+      if (spec == null) {
+        continue;
+      }
+
+      Map<String, List<GeneralStateTestCaseEipSpec>> finalStateSpecs = spec.finalStateSpecs();
+      if (finalStateSpecs == null || finalStateSpecs.isEmpty()) {
+        continue;
+      }
+
+      for (Map.Entry<String, List<GeneralStateTestCaseEipSpec>> forkEntry :
+          finalStateSpecs.entrySet()) {
+        List<GeneralStateTestCaseEipSpec> eipSpecs = forkEntry.getValue();
+        if (eipSpecs == null) {
+          continue;
+        }
+
+        for (GeneralStateTestCaseEipSpec eipSpec : eipSpecs) {
+          try {
+            String stateRoot = executeSpecWithTracing(eipSpec, tracer);
+            if (stateRoot != null) {
+              finalStateRoot = stateRoot;
+              successfulExecutions.incrementAndGet();
+            }
+          } catch (Exception e) {
+            executionErrors.incrementAndGet();
+            LOG.debug("Execution exception during tracing: {}", e.getMessage());
+          }
+        }
+      }
+    }
+
+    // Finish tracing and get hash
+    if (finalStateRoot != null) {
+      return tracer.finish(finalStateRoot);
+    } else {
+      return new TracingResult(null, null, 0);
+    }
+  }
+
+  /**
+   * Executes a single EIP spec with tracing.
+   *
+   * @param spec the EIP spec
+   * @param tracer the operation tracer
+   * @return the state root after execution, or null if skipped/failed
+   */
+  private String executeSpecWithTracing(
+      final GeneralStateTestCaseEipSpec spec, final OperationTracer tracer) {
+    if (spec == null) {
+      return null;
+    }
+
+    BlockHeader blockHeader = spec.getBlockHeader();
+    if (blockHeader == null) {
+      return null;
+    }
+
+    Transaction transaction = spec.getTransaction(0);
+    if (transaction == null) {
+      return null;
+    }
+
+    ReferenceTestWorldState initialWorldState = spec.getInitialWorldState();
+    if (initialWorldState == null) {
+      return null;
+    }
+
+    // Check gas limit constraint
+    if (transaction.getGasLimit() > blockHeader.getGasLimit() - blockHeader.getGasUsed()) {
+      skippedTests.incrementAndGet();
+      return null;
+    }
+
+    ReferenceTestWorldState worldState = initialWorldState.copy();
+
+    String forkName = spec.getFork();
+    if (forkName == null || forkName.isEmpty()) {
+      forkName = defaultFork;
+    }
+
+    ProtocolSchedule protocolSchedule = protocolSchedules.getByName(forkName);
+    if (protocolSchedule == null) {
+      return null;
+    }
+
+    ProtocolSpec protocolSpec = protocolSchedule.getByBlockHeader(blockHeader);
+    MainnetTransactionProcessor processor = protocolSpec.getTransactionProcessor();
+    WorldUpdater worldStateUpdater = worldState.updater();
+
+    // Calculate blob gas price
+    BlobGas excessBlobGas = blockHeader.getExcessBlobGas().orElse(BlobGas.ZERO);
+    Wei blobGasPrice = protocolSpec.getFeeMarket().blobGasPricePerGas(excessBlobGas);
+
+    // Process the transaction WITH tracing
+    TransactionProcessingResult result =
+        processor.processTransaction(
+            worldStateUpdater,
+            blockHeader,
+            transaction,
+            blockHeader.getCoinbase(),
+            tracer, // Use the normalizing tracer
+            (__, blockNumber) -> Hash.hash(Bytes.wrap(Long.toString(blockNumber).getBytes(UTF_8))),
+            TransactionValidationParams.processingBlock(),
+            blobGasPrice);
+
+    // Only commit state if transaction was valid
+    if (!result.isInvalid()) {
+      if (shouldClearEmptyAccounts(spec.getFork())) {
+        Account coinbase = worldStateUpdater.getOrCreate(spec.getBlockHeader().getCoinbase());
+        if (coinbase != null && coinbase.isEmpty()) {
+          worldStateUpdater.deleteAccount(coinbase.getAddress());
+        }
+        Account sender = worldStateUpdater.getAccount(transaction.getSender());
+        if (sender != null && sender.isEmpty()) {
+          worldStateUpdater.deleteAccount(sender.getAddress());
+        }
+      }
+      worldStateUpdater.commit();
+      worldState.persist(blockHeader);
+    }
+
+    return worldState.rootHash().toHexString();
   }
 
   /**
