@@ -36,6 +36,7 @@ import org.hyperledger.besu.evm.account.Account;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
 import org.hyperledger.besu.evm.tracing.OperationTracer;
 import org.hyperledger.besu.evm.worldstate.WorldUpdater;
+import org.hyperledger.besu.testfuzz.tracing.DumpTraceWriter;
 import org.hyperledger.besu.testfuzz.tracing.NormalizingOperationTracer;
 import org.hyperledger.besu.testfuzz.tracing.TracingResult;
 
@@ -517,6 +518,78 @@ public class StateTestExecutor {
     }
 
     return worldState.rootHash().toHexString();
+  }
+
+  /**
+   * Executes a state test with trace normalization and dumps the trace to a file. This method is
+   * useful for debugging divergences by comparing traces between clients.
+   *
+   * @param jsonData the state test JSON
+   * @param dumpWriter the dump writer for trace output
+   * @return the tracing result containing MD5 hash, state root, and line count
+   */
+  public TracingResult executeWithTracingAndDump(
+      final byte[] jsonData, final DumpTraceWriter dumpWriter) {
+    totalExecutions.incrementAndGet();
+
+    // Parse the JSON
+    Map<String, GeneralStateTestCaseSpec> stateTests;
+    try {
+      stateTests = objectMapper.readValue(jsonData, stateTestType);
+    } catch (Exception e) {
+      parseErrors.incrementAndGet();
+      return new TracingResult(null, null, 0);
+    }
+
+    if (stateTests == null || stateTests.isEmpty()) {
+      parseErrors.incrementAndGet();
+      return new TracingResult(null, null, 0);
+    }
+
+    // Create tracer with dump writer
+    NormalizingOperationTracer tracer = new NormalizingOperationTracer(dumpWriter);
+    String finalStateRoot = null;
+
+    // Execute each test case
+    for (Map.Entry<String, GeneralStateTestCaseSpec> entry : stateTests.entrySet()) {
+      GeneralStateTestCaseSpec spec = entry.getValue();
+      if (spec == null) {
+        continue;
+      }
+
+      Map<String, List<GeneralStateTestCaseEipSpec>> finalStateSpecs = spec.finalStateSpecs();
+      if (finalStateSpecs == null || finalStateSpecs.isEmpty()) {
+        continue;
+      }
+
+      for (Map.Entry<String, List<GeneralStateTestCaseEipSpec>> forkEntry :
+          finalStateSpecs.entrySet()) {
+        List<GeneralStateTestCaseEipSpec> eipSpecs = forkEntry.getValue();
+        if (eipSpecs == null) {
+          continue;
+        }
+
+        for (GeneralStateTestCaseEipSpec eipSpec : eipSpecs) {
+          try {
+            String stateRoot = executeSpecWithTracing(eipSpec, tracer);
+            if (stateRoot != null) {
+              finalStateRoot = stateRoot;
+              successfulExecutions.incrementAndGet();
+            }
+          } catch (Exception e) {
+            executionErrors.incrementAndGet();
+            LOG.debug("Execution exception during tracing dump: {}", e.getMessage());
+          }
+        }
+      }
+    }
+
+    // Finish tracing and get hash (this writes final entries to dump)
+    if (finalStateRoot != null) {
+      return tracer.finish(finalStateRoot);
+    } else {
+      return new TracingResult(null, null, 0);
+    }
   }
 
   /**

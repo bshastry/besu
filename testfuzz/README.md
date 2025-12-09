@@ -98,3 +98,106 @@ achieving high throughput while intelligently prioritizing inputs that discover 
 | `--new-corpus-dir` | Directory to save new interesting inputs |
 
 See `PARALLEL_FUZZER_ARCHITECTURE.md` for implementation details.
+
+## validate-corpus
+
+Validates a corpus of geth-produced enhanced state tests against Besu's execution to detect
+cross-VM consensus divergences. This tool is essential for verifying that Besu produces identical
+execution traces and state roots as other Ethereum clients.
+
+### What It Does:
+
+1. **Loads corpus files**: Reads JSON state test files with embedded `_info` metadata containing
+   trace hashes and state roots from geth execution
+2. **Parallel validation**: Executes each test against Besu using virtual threads (Java 21+)
+3. **Hash comparison**: Compares MD5 trace hashes and state roots between geth and Besu
+4. **Divergence detection**: Flags tests where Besu produces different results
+
+### Basic Usage:
+
+```shell
+# Validate a corpus directory
+./testfuzz/build/install/BesuFuzz/bin/BesuFuzz validate-corpus \
+  --corpus-dir=/path/to/enhanced/corpus \
+  --fork=Osaka \
+  --workers=16
+```
+
+### Triage Mode:
+
+When dealing with many divergences, use `--triage` to cluster them by likely root cause:
+
+```shell
+./testfuzz/build/install/BesuFuzz/bin/BesuFuzz validate-corpus \
+  --corpus-dir=/path/to/corpus \
+  --fork=Osaka \
+  --triage
+```
+
+Triage mode groups divergences by their (expectedHash, actualHash) signature pair, dramatically
+reducing the number of distinct issues to investigate. For example, 1,800 divergences might
+cluster into just 50 distinct signatures representing 50 likely bugs.
+
+### CLI Options:
+
+| Option | Description |
+|--------|-------------|
+| `--corpus-dir` | Directory containing corpus files with cross-VM metadata (required) |
+| `--fork` | EVM fork to use for execution (default: Prague) |
+| `--workers`, `-w` | Number of worker threads (default: CPU cores) |
+| `--triage` | Enable triage mode: cluster divergences by likely root cause |
+| `--dump-traces` | Dump Besu traces for divergent tests (for debugging) |
+| `--include-filtered` | Include filtered entries (STOP, depth=0) in trace dumps |
+| `--output-dir`, `-o` | Output directory for reports and trace dumps |
+| `--json` | Output machine-readable JSON report |
+| `--quiet`, `-q` | Quiet mode (suppress progress, only show final result) |
+
+### Exit Codes:
+
+- **0**: All tests passed - consensus agreement
+- **1**: Divergences detected - consensus disagreement found
+- **2**: Errors occurred (IO, parsing, etc.)
+
+### Example Output (Triage Mode):
+
+```
+========================================
+Divergence Clustering Analysis
+========================================
+
+Total divergences/errors: 1801
+Distinct clusters:        47
+Compression ratio:        38.3x
+
+By Divergence Type:
+  STATE_ROOT_AND_TRACE_MISMATCH   15 clusters,  1200 tests
+  TRACE_ONLY_MISMATCH             32 clusters,   601 tests
+
+Top 10 Clusters (by impact):
+----------------------------
+#1: Cluster[54b7c078→abf995f6] size=500 type=STATE_ROOT_AND_TRACE_MISMATCH
+    Representatives:
+      - 54b7c078fbf487f9_728.json
+      - 54b7c078fbf487f9_518.json
+      ...
+```
+
+### Workflow:
+
+1. **Generate enhanced corpus with geth**:
+   ```shell
+   # Run geth's statetest fuzzer to produce corpus with trace metadata
+   go-fuzz -bin=./statetest-fuzz.zip -workdir=/tmp/corpus
+   ```
+
+2. **Validate against Besu**:
+   ```shell
+   ./BesuFuzz validate-corpus --corpus-dir=/tmp/corpus/corpus --fork=Osaka --triage
+   ```
+
+3. **Investigate divergences**:
+   - Use triage output to identify distinct clusters
+   - Use `--dump-traces` to get detailed Besu traces for debugging
+   - Compare traces side-by-side with geth output
+
+See `CROSS_VM_CONSENSUS_COMPARISON_PLAN.md` for architecture details.

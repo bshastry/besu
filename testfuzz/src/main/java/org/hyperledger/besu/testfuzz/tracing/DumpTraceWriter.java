@@ -51,6 +51,7 @@ public class DumpTraceWriter implements Closeable {
 
   private final Writer writer;
   private final boolean includeFiltered;
+  private final String fork;
   private String lastLineHash;
 
   /**
@@ -61,8 +62,22 @@ public class DumpTraceWriter implements Closeable {
    * @throws IOException if file cannot be opened
    */
   public DumpTraceWriter(final String filePath, final boolean includeFiltered) throws IOException {
+    this(filePath, includeFiltered, null);
+  }
+
+  /**
+   * Creates a DumpTraceWriter that writes to a file with fork info.
+   *
+   * @param filePath the output file path
+   * @param includeFiltered whether to include filtered entries
+   * @param fork the EVM fork name (optional)
+   * @throws IOException if file cannot be opened
+   */
+  public DumpTraceWriter(final String filePath, final boolean includeFiltered, final String fork)
+      throws IOException {
     this.writer = new BufferedWriter(new FileWriter(filePath, StandardCharsets.UTF_8));
     this.includeFiltered = includeFiltered;
+    this.fork = fork;
     this.lastLineHash = null;
   }
 
@@ -73,9 +88,39 @@ public class DumpTraceWriter implements Closeable {
    * @param includeFiltered whether to include filtered entries
    */
   public DumpTraceWriter(final Writer writer, final boolean includeFiltered) {
+    this(writer, includeFiltered, null);
+  }
+
+  /**
+   * Creates a DumpTraceWriter that writes to a provided Writer with fork info.
+   *
+   * @param writer the output writer
+   * @param includeFiltered whether to include filtered entries
+   * @param fork the EVM fork name (optional)
+   */
+  public DumpTraceWriter(final Writer writer, final boolean includeFiltered, final String fork) {
     this.writer = writer;
     this.includeFiltered = includeFiltered;
+    this.fork = fork;
     this.lastLineHash = null;
+  }
+
+  /**
+   * Returns the fork name (if set).
+   *
+   * @return the fork name or null
+   */
+  public String getFork() {
+    return fork;
+  }
+
+  /**
+   * Returns whether filtered entries should be included.
+   *
+   * @return true if filtered entries are included
+   */
+  public boolean isIncludeFiltered() {
+    return includeFiltered;
   }
 
   /**
