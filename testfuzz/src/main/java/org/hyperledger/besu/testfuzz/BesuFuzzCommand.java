@@ -45,7 +45,8 @@ import picocli.CommandLine.Command;
       EofContainerSubCommand.class,
       P256VerifySubCommand.class,
       StateTestFuzzSubCommand.class,
-      ValidateCorpusSubCommand.class
+      ValidateCorpusSubCommand.class,
+      DumpTraceSubCommand.class
     })
 @SuppressWarnings("java:S106")
 public class BesuFuzzCommand implements Runnable {

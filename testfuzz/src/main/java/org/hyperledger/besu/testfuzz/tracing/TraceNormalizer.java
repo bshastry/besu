@@ -264,6 +264,7 @@ public class TraceNormalizer {
     OPCODE_NAMES.put(0x1b, "SHL");
     OPCODE_NAMES.put(0x1c, "SHR");
     OPCODE_NAMES.put(0x1d, "SAR");
+    OPCODE_NAMES.put(0x1e, "CLZ"); // EIP-7939: Count Leading Zeros (Osaka/Fusaka)
 
     // SHA3
     OPCODE_NAMES.put(0x20, "KECCAK256");
@@ -291,7 +292,7 @@ public class TraceNormalizer {
     OPCODE_NAMES.put(0x41, "COINBASE");
     OPCODE_NAMES.put(0x42, "TIMESTAMP");
     OPCODE_NAMES.put(0x43, "NUMBER");
-    OPCODE_NAMES.put(0x44, "PREVRANDAO");
+    OPCODE_NAMES.put(0x44, "DIFFICULTY"); // Geth uses DIFFICULTY for trace compatibility
     OPCODE_NAMES.put(0x45, "GASLIMIT");
     OPCODE_NAMES.put(0x46, "CHAINID");
     OPCODE_NAMES.put(0x47, "SELFBALANCE");
@@ -393,6 +394,25 @@ public class TraceNormalizer {
     OPCODE_NAMES.put(0xa2, "LOG2");
     OPCODE_NAMES.put(0xa3, "LOG3");
     OPCODE_NAMES.put(0xa4, "LOG4");
+
+    // EOF Data Operations (EIP-7480)
+    OPCODE_NAMES.put(0xd0, "DATALOAD");
+    OPCODE_NAMES.put(0xd1, "DATALOADN");
+    OPCODE_NAMES.put(0xd2, "DATASIZE");
+    OPCODE_NAMES.put(0xd3, "DATACOPY");
+
+    // EOF Control Flow Operations (EIP-4750, EIP-6206, EIP-663)
+    OPCODE_NAMES.put(0xe0, "RJUMP");
+    OPCODE_NAMES.put(0xe1, "RJUMPI");
+    OPCODE_NAMES.put(0xe2, "RJUMPV");
+    OPCODE_NAMES.put(0xe3, "CALLF");
+    OPCODE_NAMES.put(0xe4, "RETF");
+    OPCODE_NAMES.put(0xe5, "JUMPF");
+    OPCODE_NAMES.put(0xe6, "DUPN");
+    OPCODE_NAMES.put(0xe7, "SWAPN");
+    OPCODE_NAMES.put(0xe8, "EXCHANGE");
+    OPCODE_NAMES.put(0xec, "EOFCREATE");
+    OPCODE_NAMES.put(0xee, "RETURNCONTRACT");
 
     // System Operations
     OPCODE_NAMES.put(0xf0, "CREATE");
