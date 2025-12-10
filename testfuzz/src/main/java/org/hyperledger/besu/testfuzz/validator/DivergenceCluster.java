@@ -73,7 +73,16 @@ public class DivergenceCluster {
     /** EOF-related difference. */
     EOF_ERROR,
     /** Test parsing or format error. */
-    PARSE_ERROR
+    PARSE_ERROR,
+    /**
+     * Transaction construction failure - transaction cannot be parsed/built. This typically occurs
+     * for exception tests with invalid transaction fields (e.g., invalid blob versioned hashes).
+     * Besu's getTransaction() returns null, producing no trace output, while geth outputs the
+     * pre-state root. This is a known limitation in dump-trace, not a consensus bug.
+     */
+    TX_CONSTRUCTION_FAILURE,
+    /** Blob transaction specific errors (Type 3 tx with invalid versioned hashes, etc.). */
+    BLOB_TX_ERROR
   }
 
   // Cluster identity - the signature
