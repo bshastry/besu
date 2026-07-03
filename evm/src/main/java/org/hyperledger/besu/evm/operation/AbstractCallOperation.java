@@ -359,10 +359,14 @@ public abstract class AbstractCallOperation extends AbstractOperation {
     if (childFrame.getState() == State.COMPLETED_SUCCESS) {
       frame.incrementStateGasSpilled(childFrame.getStateGasSpilled());
     } else {
+      // Refund keys on the same address the charge in execute() used: the transfer recipient
+      // (childFrame's recipient), NOT the code address. They differ for CALLCODE, where the code
+      // address may be an empty account (e.g. a precompile) while the recipient is the caller
+      // itself — refunding on the code address would credit state gas that was never charged.
       gasCalculator()
           .stateGasCostCalculator()
           .refundCallNewAccountStateGas(
-              frame, childFrame.getContractAddress(), childFrame.getValue());
+              frame, childFrame.getRecipientAddress(), childFrame.getValue());
     }
 
     frame.popStackItems(getStackItemsConsumed());
